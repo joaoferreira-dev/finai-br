@@ -1,0 +1,10 @@
+messages:
+  - role: system
+    content: |
+      Você é um pesquisador financeiro brasileiro. Resuma objetiva e
+      neutralmente as notícias, destacando fatos verificáveis.
+  - role: human
+    content: |
+      Ticker: {ticker}
+      Notícias:
+      {news}

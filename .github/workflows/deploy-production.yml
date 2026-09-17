@@ -1,0 +1,54 @@
+name: Deploy production
+
+on:
+  workflow_run:
+    workflows: [Publish Docker image]
+    types: [completed]
+    branches: [main]
+
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      IMAGE: ghcr.io/${{ github.repository }}:sha-${{ github.event.workflow_run.head_sha }}
+      APP_DIR: ${{ secrets.PROD_APP_DIR }}
+    steps:
+      - name: Checkout deployed revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Install SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.PROD_SSH_KEY }}
+
+      - name: Trust production host
+        run: ssh-keyscan -H "${{ secrets.PROD_SSH_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Upload production Compose file
+        run: |
+          ssh "${{ secrets.PROD_SSH_USER }}@${{ secrets.PROD_SSH_HOST }}" "mkdir -p '$APP_DIR'"
+          scp docker-compose.prod.yml "${{ secrets.PROD_SSH_USER }}@${{ secrets.PROD_SSH_HOST }}:${APP_DIR}/docker-compose.prod.yml"
+
+      - name: Deploy image
+        env:
+          GHCR_USERNAME: ${{ secrets.GHCR_DEPLOY_USERNAME }}
+          GHCR_TOKEN: ${{ secrets.GHCR_DEPLOY_TOKEN }}
+        run: |
+          printf '%s' "$GHCR_TOKEN" | ssh "${{ secrets.PROD_SSH_USER }}@${{ secrets.PROD_SSH_HOST }}" \
+            "docker login ghcr.io -u '$GHCR_USERNAME' --password-stdin && \
+             mkdir -p '$APP_DIR' && \
+             printf 'FINAI_IMAGE=$IMAGE\\n' > '$APP_DIR/.image.env' && \
+             docker compose --env-file '$APP_DIR/.image.env' -f '$APP_DIR/docker-compose.prod.yml' pull && \
+             docker compose --env-file '$APP_DIR/.image.env' -f '$APP_DIR/docker-compose.prod.yml' up -d --remove-orphans && \
+             docker compose --env-file '$APP_DIR/.image.env' -f '$APP_DIR/docker-compose.prod.yml' ps"
