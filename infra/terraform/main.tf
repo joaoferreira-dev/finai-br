@@ -78,9 +78,4 @@ resource "google_compute_instance" "finai" {
     preemptible         = false
   }
 
-  lifecycle {
-    ignore_changes = [
-      metadata["ssh-keys"],
-    ]
-  }
 }

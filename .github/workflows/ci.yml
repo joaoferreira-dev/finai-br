@@ -76,6 +76,11 @@ jobs:
       - name: Terraform Validate
         run: terraform validate
 
+      - name: Generate temporary plan key
+        run: |
+          ssh-keygen -t ed25519 -N '' -C "finai-ci" -f "$RUNNER_TEMP/finai_ci_key"
+          echo "CI_SSH_PUBLIC_KEY=$(cat "$RUNNER_TEMP/finai_ci_key.pub")" >> "$GITHUB_ENV"
+
       - name: Authenticate to GCP (Optional for Live Plan)
         if: ${{ env.GCP_SA_KEY != '' }}
         uses: google-github-actions/auth@v2
@@ -91,5 +96,5 @@ jobs:
         run: |
           terraform plan \
             -var="project_id=${{ secrets.GCP_PROJECT_ID }}" \
-            -var="admin_ssh_public_key=${{ secrets.PROD_SSH_PUBLIC_KEY }}" \
+            -var="admin_ssh_public_key=$CI_SSH_PUBLIC_KEY" \
             -input=false

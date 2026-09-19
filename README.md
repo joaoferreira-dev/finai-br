@@ -53,21 +53,21 @@ Pull requests para `main` executam compilação, testes com cobertura e build da
 imagem Docker. Depois do merge em `main`, a imagem é publicada no GitHub
 Container Registry com uma tag imutável baseada no SHA do commit.
 
-O deploy de produção usa o workflow `Deploy production` e uma VPS com Docker
-Compose. A VPS precisa ter Docker, o arquivo `.env` de produção e acesso ao
-GHCR. O workflow envia apenas `docker-compose.prod.yml` e atualiza a imagem;
-segredos não são copiados do repositório.
+O deploy de produção usa o workflow `Deploy production` e uma VM GCP com Docker
+Compose. O workflow executa o Terraform, gera uma chave SSH temporária para a
+execução, aguarda o bootstrap da VM e atualiza a imagem. O arquivo `.env` de
+produção permanece na VM; segredos não são copiados do repositório.
 
 Configure no Environment `production` do GitHub:
 
-- `PROD_SSH_HOST`: host ou IP da VPS.
-- `PROD_SSH_USER`: usuário SSH.
-- `PROD_SSH_KEY`: chave privada SSH para o deploy.
-- `PROD_APP_DIR`: diretório da aplicação na VPS.
+- `GCP_PROJECT_ID`: projeto GCP onde a VM será provisionada.
+- `GCP_SA_KEY`: credencial JSON de uma service account com permissões para
+	Terraform e o bucket de state.
+- `TF_STATE_BUCKET`: bucket GCS previamente criado para o state Terraform.
 - `GHCR_DEPLOY_USERNAME`: usuário com permissão de leitura no GHCR.
 - `GHCR_DEPLOY_TOKEN`: token do GHCR com permissão `read:packages`.
 
-Na VPS, crie `${PROD_APP_DIR}/.env` com as variáveis de produção. Não
+Na VM, crie `/opt/finai/.env` com as variáveis de produção. Não
 versione nem envie esse arquivo pelo GitHub Actions.
 
 O deploy usa a imagem `sha-<commit>`. Para rollback, altere manualmente

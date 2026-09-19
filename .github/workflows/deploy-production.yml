@@ -20,32 +20,79 @@ jobs:
     environment: production
     env:
       IMAGE: ghcr.io/${{ github.repository }}:sha-${{ github.event.workflow_run.head_sha }}
-      APP_DIR: ${{ secrets.PROD_APP_DIR }}
+      APP_DIR: /opt/finai
+      SSH_USER: finai
     steps:
       - name: Checkout deployed revision
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
 
-      - name: Install SSH key
-        uses: webfactory/ssh-agent@v0.9.0
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
         with:
-          ssh-private-key: ${{ secrets.PROD_SSH_KEY }}
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.0"
+
+      - name: Generate temporary deployment key
+        run: |
+          ssh-keygen -t ed25519 -N '' -C "finai-github-actions" -f "$RUNNER_TEMP/finai_deploy_key"
+          echo "SSH_PUBLIC_KEY=$(cat "$RUNNER_TEMP/finai_deploy_key.pub")" >> "$GITHUB_ENV"
+          eval "$(ssh-agent -s)"
+          ssh-add "$RUNNER_TEMP/finai_deploy_key"
+          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
+
+      - name: Provision production infrastructure
+        working-directory: infra/terraform
+        env:
+          TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+        run: |
+          terraform init \
+            -backend-config="bucket=$TF_STATE_BUCKET" \
+            -backend-config="prefix=finai-production"
+          terraform apply -auto-approve -input=false \
+            -var="project_id=$GCP_PROJECT_ID" \
+            -var="admin_ssh_public_key=$SSH_PUBLIC_KEY"
+          echo "PROD_SSH_HOST=$(terraform output -raw instance_public_ip)" >> "$GITHUB_ENV"
 
       - name: Trust production host
-        run: ssh-keyscan -H "${{ secrets.PROD_SSH_HOST }}" >> ~/.ssh/known_hosts
+        run: |
+          for attempt in $(seq 1 60); do
+            if ssh-keyscan -T 5 -H "$PROD_SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null; then
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Production host did not become reachable over SSH" >&2
+          exit 1
+
+      - name: Wait for Docker bootstrap
+        run: |
+          for attempt in $(seq 1 60); do
+            if ssh "$SSH_USER@$PROD_SSH_HOST" "docker compose version" >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Docker bootstrap did not complete on the production host" >&2
+          exit 1
 
       - name: Upload production Compose file
         run: |
-          ssh "${{ secrets.PROD_SSH_USER }}@${{ secrets.PROD_SSH_HOST }}" "mkdir -p '$APP_DIR'"
-          scp docker-compose.prod.yml "${{ secrets.PROD_SSH_USER }}@${{ secrets.PROD_SSH_HOST }}:${APP_DIR}/docker-compose.prod.yml"
+          ssh "$SSH_USER@$PROD_SSH_HOST" "mkdir -p '$APP_DIR'"
+          scp docker-compose.prod.yml "$SSH_USER@$PROD_SSH_HOST:${APP_DIR}/docker-compose.prod.yml"
 
       - name: Deploy image
         env:
           GHCR_USERNAME: ${{ secrets.GHCR_DEPLOY_USERNAME }}
           GHCR_TOKEN: ${{ secrets.GHCR_DEPLOY_TOKEN }}
         run: |
-          printf '%s' "$GHCR_TOKEN" | ssh "${{ secrets.PROD_SSH_USER }}@${{ secrets.PROD_SSH_HOST }}" \
+          printf '%s' "$GHCR_TOKEN" | ssh "$SSH_USER@$PROD_SSH_HOST" \
             "docker login ghcr.io -u '$GHCR_USERNAME' --password-stdin && \
              mkdir -p '$APP_DIR' && \
              printf 'FINAI_IMAGE=$IMAGE\\n' > '$APP_DIR/.image.env' && \

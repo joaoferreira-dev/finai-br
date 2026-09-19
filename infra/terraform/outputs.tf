@@ -9,7 +9,7 @@ output "instance_zone" {
 }
 
 output "instance_public_ip" {
-  description = "Public IP address of the instance (use as PROD_SSH_HOST in GitHub Actions)."
+  description = "Public IP address of the instance."
   value       = google_compute_instance.finai.network_interface[0].access_config[0].nat_ip
 }
 
