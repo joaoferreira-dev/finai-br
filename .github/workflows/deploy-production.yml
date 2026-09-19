@@ -89,6 +89,19 @@ jobs:
           ssh "$SSH_USER@$PROD_SSH_HOST" "mkdir -p '$APP_DIR'"
           scp docker-compose.prod.yml "$SSH_USER@$PROD_SSH_HOST:${APP_DIR}/docker-compose.prod.yml"
 
+      - name: Configure production environment
+        env:
+          PROD_ENV_FILE: ${{ secrets.PROD_ENV_FILE }}
+        run: |
+          if [ -z "$PROD_ENV_FILE" ]; then
+            echo "PROD_ENV_FILE is required in the production environment secrets" >&2
+            exit 1
+          fi
+          printf '%s\n' "$PROD_ENV_FILE" | ssh "$SSH_USER@$PROD_SSH_HOST" \
+            "umask 077 && cat > '$APP_DIR/.env' && \
+             chown '$SSH_USER:$SSH_USER' '$APP_DIR/.env' && \
+             chmod 600 '$APP_DIR/.env'"
+
       - name: Deploy image
         env:
           GHCR_USERNAME: ${{ secrets.GHCR_DEPLOY_USERNAME }}

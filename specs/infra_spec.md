@@ -313,12 +313,13 @@ Configure these secrets in GitHub repository **Settings -> Environments -> produ
 | `APP_DIR` | `/opt/finai` | Directory on the GCP VM hosting Compose and `.env` |
 | `GHCR_DEPLOY_USERNAME` | GitHub username / bot account | Account with read access to repository packages |
 | `GHCR_DEPLOY_TOKEN` | Personal Access Token (`read:packages`) | Token allowing the GCP VM to pull private images |
+| `PROD_ENV_FILE` | GitHub Environment secret | Complete production `.env`, transferred over SSH and stored with mode `600` |
 
 ### 6.4. Initial VM Setup & Deployment Checklist
 1. **Create Terraform State:** Create a GCS bucket and configure its name as `TF_STATE_BUCKET`.
 2. **Configure GCP Secrets:** Add `GCP_PROJECT_ID` and `GCP_SA_KEY` to the GitHub `production` environment.
-3. **Seed Production `.env` on GCP:** After the first provisioning run, populate `/opt/finai/.env` with production secrets (database URL, Groq/OpenAI keys, SMTP credentials).
-4. **Trigger Deployment:** Push or merge to `main`. GitHub Actions runs Terraform, generates a temporary SSH key, waits for the VM bootstrap, and deploys the image.
+3. **Configure Production Environment:** Add the complete production `.env` as the protected `PROD_ENV_FILE` secret.
+4. **Trigger Deployment:** Push or merge to `main`. GitHub Actions runs Terraform, generates a temporary SSH key, waits for the VM bootstrap, transfers `.env` securely, and deploys the image.
 
 ### 6.5. CI Workflow Integration: Terraform Lint, Validate & Plan (`.github/workflows/ci.yml`)
 
