@@ -66,9 +66,11 @@ Configure no Environment `production` do GitHub:
 - `TF_STATE_BUCKET`: bucket GCS previamente criado para o state Terraform.
 - `GHCR_DEPLOY_USERNAME`: usuário com permissão de leitura no GHCR.
 - `GHCR_DEPLOY_TOKEN`: token do GHCR com permissão `read:packages`.
+- `PROD_ENV_FILE`: conteúdo completo do `.env` de produção como secret
+	multiline.
 
-Na VM, crie `/opt/finai/.env` com as variáveis de produção. Não
-versione nem envie esse arquivo pelo GitHub Actions.
+O workflow grava `PROD_ENV_FILE` em `/opt/finai/.env` com permissão `600` antes
+de iniciar os containers. Não versione esse arquivo.
 
 O deploy usa a imagem `sha-<commit>`. Para rollback, altere manualmente
 `FINAI_IMAGE` no arquivo `.image.env` da VPS para uma tag SHA anterior e rode:

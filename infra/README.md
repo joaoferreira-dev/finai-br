@@ -130,7 +130,12 @@ To enable automated deployments upon merging to `main`:
    - `TF_STATE_BUCKET`: Existing GCS bucket used for Terraform state.
    - `GHCR_DEPLOY_USERNAME`: Your GitHub username
    - `GHCR_DEPLOY_TOKEN`: A GitHub Personal Access Token with `read:packages` scope.
-3. Every merge to `main` will provision or update the infrastructure, generate a temporary SSH key for that run, build the Docker image, push it to GHCR, and deploy it to the GCP instance.
+   - `PROD_ENV_FILE`: Complete production `.env` content as a multiline secret.
+3. Every merge to `main` will provision or update the infrastructure, generate a temporary SSH key for that run, transfer the environment file securely, build the Docker image, push it to GHCR, and deploy it to the GCP instance.
+
+The workflow writes `PROD_ENV_FILE` to `/opt/finai/.env` over the authenticated
+SSH connection with mode `600` before starting Compose. No manual SSH setup is
+needed after provisioning.
 
 ---
 
