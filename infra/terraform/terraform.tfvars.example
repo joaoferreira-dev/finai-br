@@ -1,0 +1,21 @@
+# GCP Project Configuration
+project_id = "your-gcp-project-id"
+region     = "us-central1"
+zone       = "us-central1-a"
+
+# Machine & Disk Settings (Defaults match GCP Always Free Tier)
+instance_name = "finai-prod-vm"
+machine_type  = "e2-micro"
+disk_size_gb  = 30
+disk_type     = "pd-standard"
+
+# SSH Access Configuration
+admin_ssh_user       = "finai"
+admin_ssh_public_key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... user@example.com"
+
+# Allowed SSH CIDR ranges
+# Options:
+# - ["0.0.0.0/0"]               : Open to the world (simplest, uses SSH key auth)
+# - ["35.235.240.0/20"]         : GCP Identity-Aware Proxy (IAP) only
+# - ["YOUR_HOME_OFFICE_IP/32"]  : Restricted to your IP
+allowed_ssh_cidrs = ["0.0.0.0/0"]
