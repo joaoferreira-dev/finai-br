@@ -13,9 +13,13 @@ its existing boundary:
 - `src/delivery/` contains report channels, currently SMTP email.
 - `src/main.py` is the CLI and scheduler entry point; `src/settings.py` reads
   environment configuration.
+- `infra/` owns Infrastructure-as-Code (Terraform) and automation scripts for
+  GCP deployment under the Always Free tier (`infra/terraform/`, `infra/scripts/`).
+- `specs/` holds technical and infrastructure specifications.
 - `tests/` contains pytest tests. Add test files as `test_<area>.py`.
 - `docs/` holds product and technical documentation; do not place runtime code
   there.
+
 
 ## Build, Test, and Development Commands
 
@@ -39,10 +43,21 @@ For Docker manual runs, use `docker compose run --rm finai python -m main run`,
 `docker compose run --rm finai python -m main send-report`, or
 `docker compose run --rm finai python -m main scheduler --run-now`.
 
-GitHub Actions uses `ci.yml` for PR checks, `publish-image.yml` to publish
-SHA-tagged images to GHCR after merges to `main`, and
-`deploy-production.yml` for the parametrized VPS deployment. Never add
-credentials to workflow files or Docker build arguments.
+To validate Terraform infrastructure configurations:
+
+```powershell
+cd infra/terraform
+terraform fmt -check
+terraform init -backend=false
+terraform validate
+```
+
+GitHub Actions uses `ci.yml` for PR checks (testing Python and validating
+Terraform), `publish-image.yml` to publish SHA-tagged images to GHCR after
+merges to `main`, and `deploy-production.yml` for deploying to the GCP
+Compute Engine VM via SSH and Docker Compose. Never add credentials to workflow
+files or Docker build arguments.
+
 
 ## Coding Style & Naming Conventions
 
@@ -88,6 +103,12 @@ rotate it; do not repeat or validate the secret.
 - `get_settings()` is cached, so environment changes require a new process.
 - `docs/PRD_FinAI_BR.md` is the source for product requirements; link to it
   instead of duplicating its content here.
+- GCP deployment uses an `e2-micro` VM in `us-central1` (Always Free tier) with a
+  30 GB `pd-standard` disk and a 2 GB swapfile. `docker-compose.prod.yml` runs
+  both PostgreSQL and the FinAI container on the host. Production secrets reside
+  exclusively in `/opt/finai/.env` on the host and in GitHub Actions environment
+  secrets (`production`).
+
 
 ## Commit & Pull Request Guidelines
 
