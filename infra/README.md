@@ -47,10 +47,8 @@ infra/
    gcloud services enable compute.googleapis.com
    ```
 3. [Terraform](https://developer.hashicorp.com/terraform/install) (>= 1.5.0).
-4. An SSH key pair for instance administration:
-   ```bash
-   ssh-keygen -t ed25519 -C "finai-deploy" -f ~/.ssh/finai_gcp
-   ```
+4. A GCS bucket for the Terraform state. Create it once and keep its name in
+   the GitHub `production` environment as `TF_STATE_BUCKET`.
 
 ---
 
@@ -64,16 +62,19 @@ infra/
    ```bash
    cp terraform.tfvars.example terraform.tfvars
    ```
-3. Edit `terraform.tfvars`:
-   - Set `project_id` to your GCP Project ID.
-   - Paste the contents of `~/.ssh/finai_gcp.pub` into `admin_ssh_public_key`.
+3. Edit `terraform.tfvars` and set `project_id` to your GCP Project ID.
 4. Initialize and apply:
    ```bash
-   terraform init
+   terraform init -backend-config="bucket=<TF_STATE_BUCKET>" -backend-config="prefix=finai-production"
    terraform plan
    terraform apply
    ```
 5. Take note of the output `instance_public_ip`.
+
+The automated GitHub Actions workflow supplies `admin_ssh_public_key` by
+generating a temporary key on the runner. Manual Terraform runs must provide
+their own public key in `terraform.tfvars`; the private key must never be
+committed.
 
 ---
 
@@ -83,7 +84,7 @@ Once the VM is created, the startup script automatically installs Docker, config
 
 1. Connect to the instance:
    ```bash
-   ssh -i ~/.ssh/finai_gcp finai@<INSTANCE_PUBLIC_IP>
+   ssh -i <YOUR_PRIVATE_KEY> finai@<INSTANCE_PUBLIC_IP>
    ```
 2. Create `/opt/finai/.env` with your production secrets:
    ```bash
@@ -124,13 +125,12 @@ To enable automated deployments upon merging to `main`:
 
 1. In your GitHub repository, go to **Settings -> Environments -> New environment** and name it `production`.
 2. Add the following **Environment secrets**:
-   - `PROD_SSH_HOST`: `<INSTANCE_PUBLIC_IP>` (from Terraform output)
-   - `PROD_SSH_USER`: `finai`
-   - `PROD_SSH_KEY`: The private key contents (`~/.ssh/finai_gcp`)
-   - `PROD_APP_DIR`: `/opt/finai`
+   - `GCP_PROJECT_ID`: GCP project containing the VM.
+   - `GCP_SA_KEY`: JSON credentials for Terraform and the state bucket.
+   - `TF_STATE_BUCKET`: Existing GCS bucket used for Terraform state.
    - `GHCR_DEPLOY_USERNAME`: Your GitHub username
    - `GHCR_DEPLOY_TOKEN`: A GitHub Personal Access Token with `read:packages` scope.
-3. Every merge to `main` will build the Docker image, push it to GHCR, and deploy it to the GCP instance.
+3. Every merge to `main` will provision or update the infrastructure, generate a temporary SSH key for that run, build the Docker image, push it to GHCR, and deploy it to the GCP instance.
 
 ---
 
