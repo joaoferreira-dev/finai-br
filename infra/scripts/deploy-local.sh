@@ -19,6 +19,11 @@ IMAGE_TAG="$3"
 SSH_KEY="${4:-}"
 APP_DIR="/opt/finai"
 
+if [[ ! "${IMAGE_TAG}" =~ ^ghcr\.io/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+:(sha-[0-9a-f]{7,64}|[A-Za-z0-9_.-]+)$ ]]; then
+    echo "IMAGE_TAG must be a safe GHCR image reference with a tag."
+    exit 1
+fi
+
 SSH_CMD=(ssh)
 SCP_CMD=(scp)
 
