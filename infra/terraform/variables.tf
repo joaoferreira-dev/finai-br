@@ -59,5 +59,8 @@ variable "admin_ssh_public_key" {
 variable "allowed_ssh_cidrs" {
   description = "CIDR blocks permitted to connect to SSH (port 22). Set to your own public IP, or 35.235.240.0/20 for GCP IAP, or 0.0.0.0/0."
   type        = list(string)
-  default     = ["0.0.0.0/0"]
+  validation {
+    condition     = !contains(var.allowed_ssh_cidrs, "0.0.0.0/0")
+    error_message = "Do not expose SSH globally; use a specific administrator CIDR or the GCP IAP range."
+  }
 }

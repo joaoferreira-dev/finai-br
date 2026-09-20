@@ -63,6 +63,8 @@ infra/
    cp terraform.tfvars.example terraform.tfvars
    ```
 3. Edit `terraform.tfvars` and set `project_id` to your GCP Project ID.
+   Set `allowed_ssh_cidrs` to your administrator IP as a `/32`, or to the
+   GCP IAP range when using IAP. Never use `0.0.0.0/0`.
 4. Initialize and apply:
    ```bash
    terraform init -backend-config="bucket=<TF_STATE_BUCKET>" -backend-config="prefix=finai-production"
@@ -140,6 +142,23 @@ needed after provisioning.
 ---
 
 ## 7. Operational & Maintenance Commands
+
+### PostgreSQL via DBeaver
+
+The production Compose file binds PostgreSQL to `127.0.0.1:5433` on the VM.
+It is not exposed on the VM public interface. To connect with DBeaver, enable
+an SSH tunnel and use:
+
+- Main connection: host `127.0.0.1`, port `5433`, database `finai`.
+- Authentication: the PostgreSQL user and password from the production `.env`.
+- SSH tunnel: the VM public IP, an authorized SSH user, and its private key;
+   remote host `127.0.0.1`, remote port `5433`.
+
+The Compose change must be deployed before the tunnel can be used:
+
+```bash
+docker compose --env-file .image.env -f docker-compose.prod.yml up -d
+```
 
 From your local machine or directly on the instance:
 
