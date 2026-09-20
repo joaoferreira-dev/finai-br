@@ -64,8 +64,6 @@ Configure no Environment `production` do GitHub:
 - `GCP_SA_KEY`: credencial JSON de uma service account com permissões para
 	Terraform e o bucket de state.
 - `TF_STATE_BUCKET`: bucket GCS previamente criado para o state Terraform.
-- `SSH_ALLOWED_CIDRS`: lista Terraform de CIDRs autorizados ao SSH, por
-	exemplo `["203.0.113.10/32"]`; nunca use `0.0.0.0/0`.
 - `GHCR_DEPLOY_USERNAME`: usuário com permissão de leitura no GHCR.
 - `GHCR_DEPLOY_TOKEN`: token do GHCR com permissão `read:packages`.
 - `PROD_ENV_FILE`: conteúdo completo do `.env` de produção como secret

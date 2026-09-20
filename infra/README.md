@@ -63,8 +63,6 @@ infra/
    cp terraform.tfvars.example terraform.tfvars
    ```
 3. Edit `terraform.tfvars` and set `project_id` to your GCP Project ID.
-   Set `allowed_ssh_cidrs` to your administrator IP as a `/32`, or to the
-   GCP IAP range when using IAP. Never use `0.0.0.0/0`.
 4. Initialize and apply:
    ```bash
    terraform init -backend-config="bucket=<TF_STATE_BUCKET>" -backend-config="prefix=finai-production"

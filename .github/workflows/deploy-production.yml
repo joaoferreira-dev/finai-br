@@ -22,7 +22,6 @@ jobs:
       IMAGE: ghcr.io/${{ github.repository }}:sha-${{ github.event.workflow_run.head_sha }}
       APP_DIR: /opt/finai
       SSH_USER: finai
-      SSH_ALLOWED_CIDRS: ${{ secrets.SSH_ALLOWED_CIDRS }}
     steps:
       - name: Checkout deployed revision
         uses: actions/checkout@v4
@@ -53,16 +52,11 @@ jobs:
           TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
           GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
         run: |
-          if [ -z "$SSH_ALLOWED_CIDRS" ]; then
-            echo "SSH_ALLOWED_CIDRS is required in the production environment secrets" >&2
-            exit 1
-          fi
           terraform init \
             -backend-config="bucket=$TF_STATE_BUCKET" \
             -backend-config="prefix=finai-production"
           terraform apply -auto-approve -input=false \
             -var="project_id=$GCP_PROJECT_ID" \
-            -var="allowed_ssh_cidrs=$SSH_ALLOWED_CIDRS" \
             -var="admin_ssh_public_key=$SSH_PUBLIC_KEY"
           echo "PROD_SSH_HOST=$(terraform output -raw instance_public_ip)" >> "$GITHUB_ENV"
 
