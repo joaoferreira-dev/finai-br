@@ -6,7 +6,7 @@ This file provides project-level instructions and context for Gemini and AI assi
 
 ## 1. Project Overview & Architecture
 
-FinAI-BR is an autonomous Python 3.11+ financial analysis service tracking 5 high-liquidity B3 equities: `PETR4`, `BBAS3`, `VALE3`, `ITUB4`, and `CSMG3`.
+FinAI-BR is an autonomous Python 3.11+ financial analysis service tracking 4 B3 equities: `PETR4`, `MGLU3`, `VALE3`, and `ITUB4`.
 
 ### Concern Boundaries:
 - `src/ingestion/`: Market data (`yfinance` with `Brapi` fallback) and Google News RSS collection (previous 24 hours).

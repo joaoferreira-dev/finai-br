@@ -37,4 +37,4 @@ def test_initialise_database_creates_missing_default_assets(monkeypatch) -> None
     session.initialise_database()
 
     assert created
-    assert [asset.ticker for asset in added_assets] == ["BBAS3", "VALE3", "ITUB4", "CSMG3"]
+    assert [asset.ticker for asset in added_assets] == ["MGLU3", "VALE3", "ITUB4"]

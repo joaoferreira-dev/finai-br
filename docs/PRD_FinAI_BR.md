@@ -13,10 +13,9 @@
 ## 3. Escopo do MVP (Produto Mínimo Viável)
 O sistema operará de forma totalmente automatizada uma vez por dia, focando em um conjunto inicial de **5 ações de alta liquidez na B3**:
 * PETR4 (Petrobras)
-* BBAS3 (Banco do Brasil)
+* MGLU3 (Magazine Luiza)
 * VALE3 (Vale)
 * ITUB4 (Itaú Unibanco)
-* CSMG3 (Copasa)
 
 ### 3.1. Funcionalidades Principais (In-Scope)
 * **Coleta Automática de Dados:** Captura diária do preço de fechamento, variação percentual e volume das ações selecionadas.

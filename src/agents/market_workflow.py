@@ -90,7 +90,7 @@ class MarketWorkflow:
             "ticker": state["ticker"],
             "news": json.dumps(_number_news(state["news"]), ensure_ascii=False),
         }))
-        research = [ResearchEvidence.model_validate(item) for item in json.loads(response)]
+        research = [ResearchEvidence.model_validate(item) for item in _parse_json_response(response, list)]
         valid_ids = set(range(1, len(state["news"]) + 1))
         return {"research_summary": [item for item in research if item.source_id in valid_ids]}
 
@@ -102,7 +102,7 @@ class MarketWorkflow:
             "research_summary": json.dumps([item.model_dump() for item in state["research_summary"]], ensure_ascii=False),
             "news": json.dumps(_number_news(state["news"]), ensure_ascii=False),
         }))
-        analysis = TickerAnalysis.model_validate_json(response)
+        analysis = TickerAnalysis.model_validate(_parse_json_response(response, dict))
         valid_ids = set(range(1, len(state["news"]) + 1))
         analysis.source_ids = sorted({source_id for source_id in analysis.source_ids if source_id in valid_ids})
         cited_ids = {int(value) for value in re.findall(r"\[(\d+)\]", analysis.rationale)}
@@ -116,3 +116,20 @@ class MarketWorkflow:
 
 def _number_news(news: list[dict]) -> list[dict]:
     return [{"source_id": index, **item} for index, item in enumerate(news, start=1)]
+
+
+def _parse_json_response(response: str, expected_type: type) -> object:
+    cleaned = response.strip()
+    if cleaned.startswith("```"):
+        cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", cleaned, flags=re.IGNORECASE).strip()
+    decoder = json.JSONDecoder()
+    for index, character in enumerate(cleaned):
+        if character not in "[{":
+            continue
+        try:
+            value, _ = decoder.raw_decode(cleaned[index:])
+        except json.JSONDecodeError:
+            continue
+        if isinstance(value, expected_type):
+            return value
+    raise ValueError(f"A resposta do modelo não contém JSON {expected_type.__name__} válido")

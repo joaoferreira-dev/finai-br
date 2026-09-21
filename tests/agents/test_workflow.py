@@ -61,6 +61,23 @@ def test_workflow_invokes_researcher_and_analyst(monkeypatch) -> None:
     assert result.source_ids == [1]
 
 
+def test_workflow_accepts_markdown_json_responses(monkeypatch) -> None:
+    monkeypatch.setattr(market_workflow, "OpenAI", lambda **kwargs: FakeClient([
+        '```json\n[{"source_id":1,"summary":"Fato","relevance":"alta","potential_impact":"positivo","horizon":"curto_prazo","key_facts":["Fato"],"uncertainties":[]}]\n```',
+        'Resultado:\n```json\n{"direction":"alta","confidence":70,"time_horizon":"curto_prazo","rationale":"Fato [1]","risks":[],"source_ids":[1]}\n```',
+    ]))
+    workflow = market_workflow.MarketWorkflow(Settings(groq_api_key="test-key"))
+
+    result = workflow.invoke(
+        "PETR4",
+        {"trading_date": date(2026, 9, 17), "close": 35.2, "change_percent": 1.5, "volume": 1000},
+        [NewsItem(title="Fato", link="https://example.com")],
+    )
+
+    assert result.direction.value == "alta"
+    assert result.source_ids == [1]
+
+
 def test_workflow_supports_openai_configuration(monkeypatch) -> None:
     client = FakeClient([])
     monkeypatch.setattr(market_workflow, "OpenAI", lambda **kwargs: client)

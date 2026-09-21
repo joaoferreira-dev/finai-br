@@ -9,7 +9,7 @@
 
 ## 1. Executive Summary & Application Analysis
 
-FinAI-BR is an autonomous financial market analysis service focusing on 5 key B3 tickers (`PETR4`, `BBAS3`, `VALE3`, `ITUB4`, `CSMG3`).
+FinAI-BR is an autonomous financial market analysis service focusing on 4 B3 tickers (`PETR4`, `MGLU3`, `VALE3`, `ITUB4`).
 
 ### 1.1. Workload Characteristics
 - **Batch Cadence:**
@@ -17,7 +17,7 @@ FinAI-BR is an autonomous financial market analysis service focusing on 5 key B3
   - **08:00 BRT (Mon–Fri):** Consolidate latest analysis from PostgreSQL, render HTML report, and deliver via SMTP email. Typical duration: **5–15 seconds**.
   - **Off-hours / Weekends:** Complete idle.
 - **Resource Footprint:**
-  - **PostgreSQL 16:** ~30–50 MB RAM idle, peaks at ~80 MB during writes. Data storage: < 50 MB/year for 5 tickers.
+  - **PostgreSQL 16:** ~30–50 MB RAM idle, peaks at ~80 MB during writes. Data storage: < 50 MB/year for 4 tickers.
   - **FinAI Runner (Python 3.11):** ~80–150 MB RAM during LangGraph workflow execution.
   - **Total System RAM Footprint:** < 250 MB RAM active, < 80 MB idle.
 

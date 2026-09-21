@@ -9,10 +9,9 @@ SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
 
 DEFAULT_ASSETS = {
     "PETR4": "Petrobras PN",
-    "BBAS3": "Banco do Brasil ON",
+    "MGLU3": "Magazine Luiza ON",
     "VALE3": "Vale ON",
     "ITUB4": "Itaú Unibanco PN",
-    "CSMG3": "Copasa ON",
 }
 
 

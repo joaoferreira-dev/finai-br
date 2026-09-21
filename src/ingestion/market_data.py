@@ -9,7 +9,6 @@ import yfinance as yf
 from settings import get_settings
 
 logger = logging.getLogger(__name__)
-_yfinance_disabled = False
 
 
 def _format_price(latest: dict, previous: dict) -> dict:
@@ -60,13 +59,10 @@ def _fetch_price_brapi(ticker: str) -> dict:
 
 
 def fetch_price(ticker: str) -> dict:
-    global _yfinance_disabled
-    if not _yfinance_disabled:
-        try:
-            return _fetch_price_yfinance(ticker)
-        except Exception as yfinance_error:
-            _yfinance_disabled = True
-            logger.warning("yfinance falhou para %s; usando Brapi para o restante do ciclo: %s", ticker, yfinance_error)
+    try:
+        return _fetch_price_yfinance(ticker)
+    except Exception as yfinance_error:
+        logger.warning("yfinance falhou para %s; usando Brapi para este ativo: %s", ticker, yfinance_error)
     try:
         return _fetch_price_brapi(ticker)
     except Exception as brapi_error:
