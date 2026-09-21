@@ -50,3 +50,15 @@ class Analysis(Base):
     rationale: Mapped[str] = mapped_column(Text)
     risks_json: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    sources: Mapped[list["AnalysisNews"]] = relationship(back_populates="analysis", cascade="all, delete-orphan")
+
+
+class AnalysisNews(Base):
+    __tablename__ = "analysis_news"
+    __table_args__ = (UniqueConstraint("analysis_id", "news_id", name="uq_analysis_news"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    analysis_id: Mapped[int] = mapped_column(ForeignKey("analyses.id", ondelete="CASCADE"))
+    news_id: Mapped[int] = mapped_column(ForeignKey("news.id", ondelete="CASCADE"))
+    source_order: Mapped[int] = mapped_column(Integer)
+    analysis: Mapped[Analysis] = relationship(back_populates="sources")
+    news: Mapped[News] = relationship()

@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FinAI-BR</title>
+  <style>
+    body { margin: 0; background: #eef2f3; color: #18313b; font-family: Arial, sans-serif; }
+    .wrapper { max-width: 680px; margin: 0 auto; padding: 28px 16px; }
+    .hero { background: #123c45; color: #fff; padding: 28px; border-radius: 12px 12px 0 0; }
+    .brand { margin: 0 0 8px; color: #f5c451; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; }
+    h1 { margin: 0; font-size: 28px; }
+    .date { margin: 8px 0 0; color: #c5d8d9; }
+    .content { padding: 16px 0; }
+    .card { background: #fff; border: 1px solid #d6e1e2; border-radius: 10px; padding: 20px; margin: 0 0 14px; }
+    .card-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+    .eyebrow { margin: 0 0 4px; color: #16827b; font-size: 13px; font-weight: bold; letter-spacing: 1px; }
+    h2 { margin: 0; font-size: 20px; }
+    h3 { margin: 18px 0 8px; font-size: 13px; color: #587077; text-transform: uppercase; letter-spacing: .5px; }
+    .confidence { color: #123c45; font-size: 22px; font-weight: bold; text-align: right; }
+    .confidence small { display: block; color: #7a8c91; font-size: 11px; font-weight: normal; }
+    .metrics { display: flex; gap: 28px; margin: 18px 0; padding: 12px 0; border-top: 1px solid #e5eded; border-bottom: 1px solid #e5eded; }
+    .metrics span { color: #71858a; font-size: 12px; }
+    .metrics strong { display: block; color: #18313b; font-size: 16px; margin-top: 4px; }
+    .positive { color: #16827b !important; }.negative { color: #c45b4d !important; }
+    .rationale { line-height: 1.55; margin: 0; }
+    ul { padding-left: 20px; line-height: 1.5; }.sources li { margin: 6px 0; }
+    a { color: #147b83; }.sources span { color: #7a8c91; font-size: 12px; margin-left: 8px; }
+    .footer { color: #71858a; font-size: 12px; text-align: center; padding: 4px 16px; }
+    @media (max-width: 480px) { .hero { padding: 22px; }.card { padding: 16px; }.metrics { gap: 18px; } }
+  </style>
+</head>
+<body>
+  <main class="wrapper">
+    <header class="hero"><p class="brand">FinAI-BR</p><h1>Panorama diário</h1><p class="date">{{REPORT_DATE}}</p></header>
+    <section class="content">{{CARDS}}</section>
+    <p class="footer">Relatório informativo. Não constitui recomendação de investimento.</p>
+  </main>
+</body>
+</html>

@@ -87,7 +87,7 @@ class MarketWorkflow:
     def research(self, state: WorkflowState) -> dict:
         return {"research_summary": self.ask(_as_openai_messages(self.research_prompt, {
             "ticker": state["ticker"],
-            "news": json.dumps(state["news"], ensure_ascii=False),
+            "news": json.dumps(_number_news(state["news"]), ensure_ascii=False),
         }))}
 
     def analyse(self, state: WorkflowState) -> dict:
@@ -95,9 +95,17 @@ class MarketWorkflow:
         response = self.ask(_as_openai_messages(self.analyse_prompt, {
             "price": json.dumps(price, ensure_ascii=False),
             "research_summary": state["research_summary"],
+            "news": json.dumps(_number_news(state["news"]), ensure_ascii=False),
         }))
-        return {"analysis": TickerAnalysis.model_validate_json(response)}
+        analysis = TickerAnalysis.model_validate_json(response)
+        valid_ids = set(range(1, len(state["news"]) + 1))
+        analysis.source_ids = sorted({source_id for source_id in analysis.source_ids if source_id in valid_ids})
+        return {"analysis": analysis}
 
     def invoke(self, ticker: str, price: dict, news: list[NewsItem]) -> TickerAnalysis:
         output = self.graph.invoke({"ticker": ticker, "price": price, "news": [item.model_dump(mode="json") for item in news]})
         return output["analysis"]
+
+
+def _number_news(news: list[dict]) -> list[dict]:
+    return [{"source_id": index, **item} for index, item in enumerate(news, start=1)]

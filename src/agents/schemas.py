@@ -16,3 +16,4 @@ class TickerAnalysis(BaseModel):
     confidence: int = Field(ge=0, le=100)
     rationale: str = Field(min_length=1, max_length=1000)
     risks: list[str] = Field(default_factory=list)
+    source_ids: list[int] = Field(default_factory=list)

@@ -10,7 +10,7 @@ from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy import select
 
 from agents.market_workflow import MarketWorkflow
-from database.models import Analysis, Asset, News, Price
+from database.models import Analysis, AnalysisNews, Asset, News, Price
 from database.session import DEFAULT_ASSETS, SessionLocal, initialise_database
 from delivery.email import send_latest_report
 from ingestion.market_data import fetch_price
@@ -47,8 +47,20 @@ def run_daily_cycle() -> None:
                 if existing:
                     for key, value in values.items():
                         setattr(existing, key, value)
+                    existing.sources.clear()
+                    analysis_record = existing
                 else:
-                    session.add(Analysis(asset_id=asset.id, analysis_date=price["trading_date"], **values))
+                    analysis_record = Analysis(asset_id=asset.id, analysis_date=price["trading_date"], **values)
+                    session.add(analysis_record)
+                session.flush()
+                source_links = [news_item.link for index, news_item in enumerate(news, start=1) if index in analysis.source_ids and news_item.link]
+                persisted_news = session.scalars(select(News).where(News.link.in_(source_links))).all() if source_links else []
+                news_by_link = {item.link: item for item in persisted_news}
+                analysis_record.sources.extend(
+                    AnalysisNews(news_id=news_by_link[item.link].id, source_order=index)
+                    for index, item in enumerate(news, start=1)
+                    if index in analysis.source_ids and item.link in news_by_link
+                )
                 session.commit()
             logger.info("%s: persistência concluída", asset.ticker)
         except Exception:

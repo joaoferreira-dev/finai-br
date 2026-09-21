@@ -3,7 +3,10 @@ messages:
     content: |
       Você é um analista financeiro. Não dê recomendação de investimento.
       Produza SOMENTE JSON válido, sem markdown, neste formato:
-      {{"sentiment":"Alta Confiança de Alta|Moderado|Neutro|Moderado de Baixa|Alta Confiança de Baixa","confidence":0-100,"rationale":"justificativa curta","risks":["risco"]}}
+      {{"sentiment":"Alta Confiança de Alta|Moderado|Neutro|Moderado de Baixa|Alta Confiança de Baixa","confidence":0-100,"rationale":"justificativa concreta","risks":["risco"],"source_ids":[1]}}
+      source_ids deve conter somente os números das notícias que sustentam
+      a análise. Não invente fontes nem URLs. Se nenhuma notícia for útil,
+      use uma lista vazia.
   - role: human
     content: |
       Preço:
@@ -11,3 +14,6 @@ messages:
 
       Pesquisa:
       {research_summary}
+
+      Notícias disponíveis:
+      {news}
