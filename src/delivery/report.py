@@ -41,6 +41,11 @@ def _format_date(value: date | datetime | None) -> str:
     return value.strftime("%d/%m/%Y") if value else "Data não informada"
 
 
+def _format_number(value: float, signed: bool = False) -> str:
+    prefix = "+" if signed and value > 0 else ""
+    return f"{prefix}{value:.2f}".replace(".", ",")
+
+
 def _format_source(source: ReportSource) -> str:
     link = _safe_link(source.link)
     if not link:
@@ -61,7 +66,7 @@ def render_text(items: list[ReportItem]) -> str:
         sections.extend([
             f"{item.ticker}: {_display_direction(item.sentiment)} ({item.confidence}%)",
             f"Horizonte: {item.time_horizon or 'incerto'}",
-            f"Fechamento: R$ {item.close:.2f} ({item.change_percent:+.2f}%)",
+            f"Fechamento: R$ {_format_number(item.close)} ({_format_number(item.change_percent, signed=True)}%)",
             f"Análise: {item.rationale}",
         ])
         if item.risks:
@@ -95,14 +100,19 @@ def render_html(items: list[ReportItem]) -> str:
         source_section = "".join(sources) or "<li>Nenhuma fonte citada pelo agente.</li>"
         cards.append(f"""
         <article class="card">
-                    <div class="card-header">
-                        <div><p class="eyebrow">{html.escape(item.ticker)}</p><h2>{html.escape(_display_direction(item.sentiment))}</h2><p>Horizonte: {html.escape(item.time_horizon or "incerto")}</p></div>
-            <div class="confidence">{item.confidence}%<small>confiança</small></div>
-          </div>
-          <div class="metrics"><span>Fechamento<strong>R$ {item.close:.2f}</strong></span><span>Variação<strong class="{change_class}">{item.change_percent:+.2f}%</strong></span></div>
+          <header class="card-header">
+            <div class="header-metric asset"><span>Ativo</span><strong>{html.escape(item.ticker)}</strong></div>
+            <div class="header-metric"><span>Impacto</span><strong>{html.escape(_display_direction(item.sentiment).replace("Impacto ", ""))}</strong></div>
+            <div class="header-metric"><span>Confiança</span><strong>{item.confidence}%</strong></div>
+            <div class="header-metric"><span>Horizonte</span><strong>{html.escape(item.time_horizon or "incerto")}</strong></div>
+          </header>
+          <section class="metrics" aria-label="Dados de mercado">
+            <div class="market-metric"><span>Fechamento</span><strong>R$ {_format_number(item.close)}</strong></div>
+            <div class="market-metric"><span>Variação</span><strong class="{change_class}">{_format_number(item.change_percent, signed=True)}%</strong></div>
+          </section>
           <p class="rationale">{html.escape(item.rationale)}</p>
           {risks_section}
-          <h3>Fontes</h3><ul class="sources">{''.join(sources)}</ul>
+          <h3>Fontes</h3><ul class="sources">{source_section}</ul>
         </article>
         """)
     report_date = html.escape(_format_date(max(item.analysis_date for item in items)))
