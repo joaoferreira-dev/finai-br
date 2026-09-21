@@ -8,6 +8,7 @@ def make_item() -> ReportItem:
         ticker="VALE3",
         analysis_date=date(2026, 9, 18),
         sentiment="Moderado",
+        time_horizon="incerto",
         confidence=70,
         rationale="Dados mistos e pressão recente no preço.",
         risks=["Volatilidade < elevada"],

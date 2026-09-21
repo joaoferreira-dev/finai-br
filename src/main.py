@@ -43,7 +43,7 @@ def run_daily_cycle() -> None:
                     if item.link and not session.scalar(select(News).where(News.link == item.link)):
                         session.add(News(asset_id=asset.id, **item.model_dump()))
                 existing = session.scalar(select(Analysis).where(Analysis.asset_id == asset.id, Analysis.analysis_date == price["trading_date"]))
-                values = dict(sentiment=analysis.sentiment.value, confidence=analysis.confidence, rationale=analysis.rationale, risks_json=json.dumps(analysis.risks, ensure_ascii=False))
+                values = dict(sentiment=analysis.direction.value, direction=analysis.direction.value, time_horizon=analysis.time_horizon.value, confidence=analysis.confidence, rationale=analysis.rationale, risks_json=json.dumps(analysis.risks, ensure_ascii=False))
                 if existing:
                     for key, value in values.items():
                         setattr(existing, key, value)

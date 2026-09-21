@@ -47,6 +47,8 @@ class Analysis(Base):
     analysis_date: Mapped[date] = mapped_column(Date)
     sentiment: Mapped[str] = mapped_column(String(40))
     confidence: Mapped[int] = mapped_column(Integer)
+    direction: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    time_horizon: Mapped[str | None] = mapped_column(String(20), nullable=True)
     rationale: Mapped[str] = mapped_column(Text)
     risks_json: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)

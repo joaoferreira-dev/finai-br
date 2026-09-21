@@ -44,8 +44,8 @@ def test_workflow_requires_provider_credentials() -> None:
 
 def test_workflow_invokes_researcher_and_analyst(monkeypatch) -> None:
     monkeypatch.setattr(market_workflow, "OpenAI", lambda **kwargs: FakeClient([
-        "Resumo das noticias",
-        '{"sentiment":"Moderado","confidence":72,"rationale":"Dados mistos","risks":["volatilidade"]}',
+        '[{"source_id":1,"summary":"Fato relevante","relevance":"alta","potential_impact":"misto","horizon":"incerto","key_facts":["Fato"],"uncertainties":["Incerteza"]}]',
+        '{"direction":"neutro","confidence":72,"time_horizon":"incerto","rationale":"Dados mistos [1]","risks":["volatilidade"],"source_ids":[1]}',
     ]))
     workflow = market_workflow.MarketWorkflow(Settings(groq_api_key="test-key"))
 
@@ -55,9 +55,10 @@ def test_workflow_invokes_researcher_and_analyst(monkeypatch) -> None:
         [NewsItem(title="Fato", link="https://example.com")],
     )
 
-    assert result.sentiment is Sentiment.MODERATE
+    assert result.direction.value == "neutro"
     assert result.confidence == 72
     assert result.risks == ["volatilidade"]
+    assert result.source_ids == [1]
 
 
 def test_workflow_supports_openai_configuration(monkeypatch) -> None:

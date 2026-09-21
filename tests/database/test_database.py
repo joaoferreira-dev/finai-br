@@ -32,6 +32,7 @@ def test_initialise_database_creates_missing_default_assets(monkeypatch) -> None
 
     monkeypatch.setattr(session.Base, "metadata", FakeMetadata())
     monkeypatch.setattr(session, "SessionLocal", FakeSession)
+    monkeypatch.setattr(session, "_ensure_analysis_columns", lambda: None)
 
     session.initialise_database()
 

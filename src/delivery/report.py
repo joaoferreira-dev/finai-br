@@ -18,6 +18,7 @@ class ReportItem:
     ticker: str
     analysis_date: date
     sentiment: str
+    time_horizon: str | None
     confidence: int
     rationale: str
     risks: list[str]
@@ -47,6 +48,10 @@ def _format_source(source: ReportSource) -> str:
     return f"- {source.title} ({link})"
 
 
+def _display_direction(value: str) -> str:
+    return {"alta": "Impacto positivo", "neutro": "Impacto neutro", "baixa": "Impacto negativo"}.get(value, value)
+
+
 def render_text(items: list[ReportItem]) -> str:
     if not items:
         return "FinAI-BR\n\nNão há análises disponíveis."
@@ -54,7 +59,8 @@ def render_text(items: list[ReportItem]) -> str:
     sections = [f"FinAI-BR — {_format_date(report_date)}", ""]
     for item in items:
         sections.extend([
-            f"{item.ticker}: {item.sentiment} ({item.confidence}%)",
+            f"{item.ticker}: {_display_direction(item.sentiment)} ({item.confidence}%)",
+            f"Horizonte: {item.time_horizon or 'incerto'}",
             f"Fechamento: R$ {item.close:.2f} ({item.change_percent:+.2f}%)",
             f"Análise: {item.rationale}",
         ])
@@ -89,8 +95,8 @@ def render_html(items: list[ReportItem]) -> str:
         source_section = "".join(sources) or "<li>Nenhuma fonte citada pelo agente.</li>"
         cards.append(f"""
         <article class="card">
-          <div class="card-header">
-            <div><p class="eyebrow">{html.escape(item.ticker)}</p><h2>{html.escape(item.sentiment)}</h2></div>
+                    <div class="card-header">
+                        <div><p class="eyebrow">{html.escape(item.ticker)}</p><h2>{html.escape(_display_direction(item.sentiment))}</h2><p>Horizonte: {html.escape(item.time_horizon or "incerto")}</p></div>
             <div class="confidence">{item.confidence}%<small>confiança</small></div>
           </div>
           <div class="metrics"><span>Fechamento<strong>R$ {item.close:.2f}</strong></span><span>Variação<strong class="{change_class}">{item.change_percent:+.2f}%</strong></span></div>
@@ -112,7 +118,8 @@ def report_items_from_rows(rows: list[object]) -> list[ReportItem]:
         items.append(ReportItem(
             ticker=asset.ticker,
             analysis_date=analysis.analysis_date,
-            sentiment=analysis.sentiment,
+            sentiment=getattr(analysis, "direction", None) or analysis.sentiment,
+            time_horizon=getattr(analysis, "time_horizon", None),
             confidence=analysis.confidence,
             rationale=analysis.rationale,
             risks=json.loads(getattr(analysis, "risks_json", "[]")),
