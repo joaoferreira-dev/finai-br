@@ -44,8 +44,8 @@ def test_workflow_requires_provider_credentials() -> None:
 
 def test_workflow_invokes_researcher_and_analyst(monkeypatch) -> None:
     monkeypatch.setattr(market_workflow, "OpenAI", lambda **kwargs: FakeClient([
-        "Resumo das noticias",
-        '{"sentiment":"Moderado","confidence":72,"rationale":"Dados mistos","risks":["volatilidade"]}',
+        '[{"source_id":1,"summary":"Fato relevante","relevance":"alta","potential_impact":"misto","horizon":"incerto","key_facts":["Fato"],"uncertainties":["Incerteza"]}]',
+        '{"direction":"neutro","confidence":72,"time_horizon":"incerto","rationale":"Dados mistos [1]","risks":["volatilidade"],"source_ids":[1]}',
     ]))
     workflow = market_workflow.MarketWorkflow(Settings(groq_api_key="test-key"))
 
@@ -55,9 +55,27 @@ def test_workflow_invokes_researcher_and_analyst(monkeypatch) -> None:
         [NewsItem(title="Fato", link="https://example.com")],
     )
 
-    assert result.sentiment is Sentiment.MODERATE
+    assert result.direction.value == "neutro"
     assert result.confidence == 72
     assert result.risks == ["volatilidade"]
+    assert result.source_ids == [1]
+
+
+def test_workflow_accepts_markdown_json_responses(monkeypatch) -> None:
+    monkeypatch.setattr(market_workflow, "OpenAI", lambda **kwargs: FakeClient([
+        '```json\n[{"source_id":1,"summary":"Fato","relevance":"alta","potential_impact":"positivo","horizon":"curto_prazo","key_facts":["Fato"],"uncertainties":[]}]\n```',
+        'Resultado:\n```json\n{"direction":"alta","confidence":70,"time_horizon":"curto_prazo","rationale":"Fato [1]","risks":[],"source_ids":[1]}\n```',
+    ]))
+    workflow = market_workflow.MarketWorkflow(Settings(groq_api_key="test-key"))
+
+    result = workflow.invoke(
+        "PETR4",
+        {"trading_date": date(2026, 9, 17), "close": 35.2, "change_percent": 1.5, "volume": 1000},
+        [NewsItem(title="Fato", link="https://example.com")],
+    )
+
+    assert result.direction.value == "alta"
+    assert result.source_ids == [1]
 
 
 def test_workflow_supports_openai_configuration(monkeypatch) -> None:

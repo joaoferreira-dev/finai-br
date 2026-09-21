@@ -87,7 +87,9 @@ def test_send_latest_report_formats_latest_analysis(monkeypatch) -> None:
         def send_message(self, message):
             self.message = message
             assert message["To"] == "to@example.com"
-            assert "PETR4: Moderado (72%)" in message.get_content()
+            parts = {part.get_content_type(): part.get_content() for part in message.walk() if part.get_content_type() in {"text/plain", "text/html"}}
+            assert "PETR4: Moderado (72%)" in parts["text/plain"]
+            assert "Panorama diário" in parts["text/html"]
 
     monkeypatch.setattr(email, "get_settings", lambda: settings)
     monkeypatch.setattr(email, "SessionLocal", FakeSession)

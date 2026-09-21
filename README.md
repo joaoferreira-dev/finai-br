@@ -1,6 +1,6 @@
 # FinAI-BR
 
-MVP de um agente diário para acompanhar PETR4, BBAS3, VALE3, ITUB4 e CSMG3.
+MVP de um agente diário para acompanhar PETR4, MGLU3, VALE3 e ITUB4.
 Ele coleta preços e notícias, usa dois nós de análise em LangGraph, persiste o
 resultado em PostgreSQL e pode enviar um resumo por e-mail.
 

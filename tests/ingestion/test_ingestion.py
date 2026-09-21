@@ -36,7 +36,6 @@ def test_fetch_news_keeps_recent_entries_and_discards_old_entries(monkeypatch) -
 
 
 def test_fetch_price_calculates_change_from_previous_close(monkeypatch) -> None:
-    monkeypatch.setattr(market_data, "_yfinance_disabled", False)
     history = pd.DataFrame(
         {"Close": [100.0, 110.0], "Volume": [1000, 2500]},
         index=pd.to_datetime(["2026-09-15", "2026-09-16"]),
@@ -58,7 +57,6 @@ def test_fetch_price_calculates_change_from_previous_close(monkeypatch) -> None:
 
 
 def test_fetch_price_raises_when_history_is_empty(monkeypatch) -> None:
-    monkeypatch.setattr(market_data, "_yfinance_disabled", False)
     class FakeTicker:
         def history(self, **kwargs):
             return pd.DataFrame()
@@ -85,3 +83,25 @@ def test_fetch_price_uses_brapi_when_yfinance_is_rate_limited(monkeypatch) -> No
     monkeypatch.setattr(market_data, "_fetch_price_brapi", lambda ticker: fallback)
 
     assert market_data.fetch_price("PETR4") == fallback
+
+
+def test_fetch_price_retries_yfinance_for_each_ticker(monkeypatch) -> None:
+    attempted = []
+    fallback = {
+        "trading_date": datetime(2026, 9, 16).date(),
+        "close": 35.2,
+        "change_percent": 1.5,
+        "volume": 1000,
+    }
+
+    def fail_yfinance(ticker):
+        attempted.append(ticker)
+        raise RuntimeError("rate limited")
+
+    monkeypatch.setattr(market_data, "_fetch_price_yfinance", fail_yfinance)
+    monkeypatch.setattr(market_data, "_fetch_price_brapi", lambda ticker: fallback)
+
+    market_data.fetch_price("PETR4")
+    market_data.fetch_price("BBAS3")
+
+    assert attempted == ["PETR4", "BBAS3"]
