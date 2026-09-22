@@ -90,10 +90,16 @@ def main() -> None:
         send_latest_report()
         logger.info("Envio de relatório finalizado")
     else:
-        scheduler = BlockingScheduler(timezone=ZoneInfo("America/Sao_Paulo"))
+        scheduler_timezone = ZoneInfo("America/Sao_Paulo")
+        scheduler = BlockingScheduler(timezone=scheduler_timezone)
         scheduler.add_listener(_log_scheduler_event, EVENT_JOB_EXECUTED | EVENT_JOB_ERROR)
-        scheduler.add_job(run_daily_cycle, CronTrigger(day_of_week="mon-fri", hour=18, minute=0), id="daily-cycle")
-        scheduler.add_job(send_latest_report, CronTrigger(day_of_week="mon-fri", hour=8, minute=0), id="send-report")
+        scheduler.add_job(run_daily_cycle, CronTrigger(day_of_week="mon-fri", hour=18, minute=0, timezone=scheduler_timezone), id="daily-cycle")
+        scheduler.add_job(
+            send_latest_report,
+            CronTrigger(day_of_week="mon-fri", hour=8, minute=0, timezone=scheduler_timezone),
+            id="send-report",
+            misfire_grace_time=300,
+        )
         for job in scheduler.get_jobs():
             logger.info("Job '%s' registrado com trigger %s", job.id, job.trigger)
         if args.run_now:
