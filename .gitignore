@@ -28,6 +28,7 @@ coverage.xml
 .hypothesis/
 
 # Local tooling and operating-system files
+.vscode/
 .vscode/*
 !.vscode/extensions.json
 !.vscode/settings.json
