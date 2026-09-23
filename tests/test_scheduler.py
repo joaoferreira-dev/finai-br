@@ -76,7 +76,7 @@ def test_overlapping_run_is_logged_as_error(scheduler, caplog):
     assert "execução anterior ainda ativa" in caplog.text
 
 
-@pytest.mark.parametrize("job_id,utc_hour", [("daily-cycle", 21), ("send-report", 11)])
+@pytest.mark.parametrize("job_id,utc_hour", [("daily-cycle", 21), ("send-report", 9)])
 def test_weekday_jobs_use_sao_paulo_time(scheduler, job_id, utc_hour):
     instance, _ = scheduler
     job = instance.get_job(job_id)

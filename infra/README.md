@@ -11,7 +11,7 @@ This directory contains the Infrastructure-as-Code (IaC) configuration and opera
 - **Memory Optimization:** 2 GB Linux swapfile (`/swapfile`) configured automatically by `scripts/startup.sh`.
 - **Workloads:**
   - `db`: `postgres:16-alpine` with persistent volume.
-  - `finai`: Daily analysis (`18:00 BRT`) and HTML report email (`08:00 BRT`).
+  - `finai`: Daily analysis (`18:00 BRT`) and HTML report email (`06:00 BRT`).
 - **Operating Cost:** **$0.00 / month** under GCP Always Free Tier quotas.
 
 ---

@@ -36,7 +36,7 @@ O sistema operará de forma totalmente automatizada uma vez por dia, focando em 
 * **RF-002:** O sistema deve buscar as notícias publicadas nas últimas 24 horas sobre as ações cadastradas.
 * **RF-003:** O agente de IA deve classificar o sentimento do mercado para cada ação em uma escala padronizada: Alta Confiança de Alta, Moderado, Neutro, Moderado de Baixa, Alta Confiança de Baixa.
 * **RF-004:** O sistema deve estruturar o output da IA obrigatoriamente em formato JSON para garantir a consistência antes de salvar no banco de dados.
-* **RF-005:** O sistema deve enviar uma notificação formatada por email até as 08h00 do dia útil seguinte contendo o resumo consolidado.
+* **RF-005:** O sistema deve enviar uma notificação formatada por email até as 06h00 do dia útil seguinte contendo o resumo consolidado.
 
 ## 5. Requisitos Não-Funcionais (RNF)
 * **RNF-001 (Linguagem):** Toda a base de código do ecossistema deve ser desenvolvida em **Python 3.11+**.
