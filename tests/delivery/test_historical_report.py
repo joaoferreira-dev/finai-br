@@ -46,7 +46,9 @@ def test_legacy_and_missing_metrics_render_without_invented_numbers() -> None:
     item = report_items_from_rows([legacy])[0]
     assert "Histórico: indisponível" in render_text([item])
     assert "(indisponível)" in render_text([item])
-    assert "Histórico" in render_html([item])
+    legacy_html = render_html([item])
+    assert "Histórico" in legacy_html
+    assert '<strong class="">indisponível</strong>' in legacy_html
 
 
 def test_partial_context_shows_unavailable_metrics_in_both_formats() -> None:

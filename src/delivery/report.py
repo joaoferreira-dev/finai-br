@@ -129,7 +129,11 @@ def render_html(items: list[ReportItem]) -> str:
         return "<p>Não há análises disponíveis.</p>"
     cards = []
     for item in items:
-        change_class = "positive" if item.change_percent is not None and item.change_percent >= 0 else "negative"
+        change_class = (
+            "" if item.change_percent is None
+            else "positive" if item.change_percent >= 0
+            else "negative"
+        )
         risks = "".join(f"<li>{html.escape(risk)}</li>" for risk in item.risks)
         risks_section = f"<h3>Riscos</h3><ul>{risks}</ul>" if risks else ""
         sources = []
