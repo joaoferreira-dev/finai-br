@@ -122,7 +122,7 @@ def create_scheduler() -> BlockingScheduler:
     )
     for job_id, callback, hour in (
         ("daily-cycle", run_daily_cycle, 18),
-        ("send-report", send_latest_report, 8),
+        ("send-report", send_latest_report, 6),
     ):
         scheduler.add_job(
             callback,
