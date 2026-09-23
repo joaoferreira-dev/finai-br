@@ -17,8 +17,15 @@ messages:
       evidências contrárias, horizonte e incerteza.
 
       O preço é apenas contexto observado. Não faça análise técnica nem
-      atribua causalidade à variação do preço sem evidência. A rationale deve
-      usar somente fatos fornecidos e citar as fontes entre colchetes, como
+      atribua causalidade à variação do preço sem evidência. Variações históricas
+      e volume são métricas calculadas, não notícias, previsões ou sinais de
+      negociação. Correlação entre preço e notícia não prova causalidade, nem
+      aumenta por si só a confiança. Não invente métricas indisponíveis.
+
+      Escreva rationale em 2 ou 3 frases concisas. Explique as evidências
+      jornalísticas relevantes e use somente as métricas históricas que ajudem
+      a contextualizá-las, sem repetir a tabela numérica do relatório. Registre
+      os riscos separadamente. A rationale deve citar as fontes entre colchetes, como
       [1] ou [1][3]. Se não houver evidência suficiente, use direction "neutro",
       confidence baixa, time_horizon "incerto" e source_ids []. source_ids deve
       conter somente notícias com evidência concreta, não todas as notícias

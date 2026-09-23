@@ -37,13 +37,13 @@ def test_fetch_news_keeps_recent_entries_and_discards_old_entries(monkeypatch) -
 
 def test_fetch_price_calculates_change_from_previous_close(monkeypatch) -> None:
     history = pd.DataFrame(
-        {"Close": [100.0, 110.0], "Volume": [1000, 2500]},
+        {"Close": [100.0, 110.0], "Adj Close": [98.0, 108.0], "Volume": [1000, 2500]},
         index=pd.to_datetime(["2026-09-15", "2026-09-16"]),
     )
 
     class FakeTicker:
         def history(self, **kwargs):
-            assert kwargs == {"period": "5d", "auto_adjust": False}
+            assert kwargs == {"period": "3mo", "interval": "1d", "auto_adjust": False}
             return history
 
     monkeypatch.setattr(market_data.yf, "Ticker", lambda ticker: FakeTicker())
@@ -54,6 +54,7 @@ def test_fetch_price_calculates_change_from_previous_close(monkeypatch) -> None:
     assert result["close"] == 110.0
     assert result["change_percent"] == pytest.approx(10.0)
     assert result["volume"] == 2500
+    assert result["historical_context"]["change_5_sessions"]["value"] is None
 
 
 def test_fetch_price_raises_when_history_is_empty(monkeypatch) -> None:

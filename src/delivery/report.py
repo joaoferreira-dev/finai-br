@@ -5,6 +5,10 @@ from datetime import date, datetime
 from pathlib import Path
 from urllib.parse import urlparse
 
+from pydantic import ValidationError
+
+from ingestion.market_context import HistoricalContext, HistoricalMetric
+
 
 @dataclass(frozen=True)
 class ReportSource:
@@ -23,8 +27,10 @@ class ReportItem:
     rationale: str
     risks: list[str]
     close: float
-    change_percent: float
+    change_percent: float | None
     sources: list[ReportSource]
+    volume: int | None = None
+    historical_context: HistoricalContext | None = None
 
 
 TEMPLATE_PATH = Path(__file__).parent / "templates" / "report.html"
@@ -44,6 +50,43 @@ def _format_date(value: date | datetime | None) -> str:
 def _format_number(value: float, signed: bool = False) -> str:
     prefix = "+" if signed and value > 0 else ""
     return f"{prefix}{value:.2f}".replace(".", ",")
+
+
+def _format_change(value: float | None) -> str:
+    return f"{_format_number(value, signed=True)}%" if value is not None else "indisponível"
+
+
+def _format_metric(metric: HistoricalMetric, *, suffix: str) -> str:
+    if metric.value is None:
+        return f"indisponível ({metric.reason})"
+    period = (
+        f" ({_format_date(metric.start_date)} a {_format_date(metric.end_date)})"
+        if metric.start_date and metric.end_date else ""
+    )
+    return f"{_format_number(metric.value, signed=suffix == '%')}{suffix}{period}"
+
+
+def _historical_lines(item: ReportItem) -> list[str]:
+    context = item.historical_context
+    if context is None:
+        return ["Histórico: indisponível (análise anterior às métricas históricas)"]
+    ratio = context.volume_ratio_20_sessions
+    volume = _format_metric(ratio, suffix="×") if ratio.value is None else f"{_format_number(ratio.value)}×"
+    if ratio.value is not None:
+        current = str(item.volume) if item.volume is not None else "indisponível"
+        average_metric = context.average_volume_20_sessions
+        average = _format_number(average_metric.value)
+        volume += (
+            f" (atual {current} em {_format_date(context.as_of_date)}; "
+            f"média {average} de {_format_date(average_metric.start_date)} "
+            f"a {_format_date(average_metric.end_date)})"
+        )
+    return [
+        f"Cotação em: {_format_date(context.as_of_date)}",
+        f"Variação ajustada em 5 pregões: {_format_metric(context.change_5_sessions, suffix='%')}",
+        f"Variação ajustada em 30 pregões: {_format_metric(context.change_30_sessions, suffix='%')}",
+        f"Volume vs. média dos 20 pregões anteriores: {volume}",
+    ]
 
 
 def _format_source(source: ReportSource) -> str:
@@ -66,7 +109,8 @@ def render_text(items: list[ReportItem]) -> str:
         sections.extend([
             f"{item.ticker}: {_display_direction(item.sentiment)} ({item.confidence}%)",
             f"Horizonte: {item.time_horizon or 'incerto'}",
-            f"Fechamento: R$ {_format_number(item.close)} ({_format_number(item.change_percent, signed=True)}%)",
+            f"Fechamento: R$ {_format_number(item.close)} ({_format_change(item.change_percent)})",
+            *_historical_lines(item),
             f"Análise: {item.rationale}",
         ])
         if item.risks:
@@ -85,7 +129,7 @@ def render_html(items: list[ReportItem]) -> str:
         return "<p>Não há análises disponíveis.</p>"
     cards = []
     for item in items:
-        change_class = "positive" if item.change_percent >= 0 else "negative"
+        change_class = "positive" if item.change_percent is not None and item.change_percent >= 0 else "negative"
         risks = "".join(f"<li>{html.escape(risk)}</li>" for risk in item.risks)
         risks_section = f"<h3>Riscos</h3><ul>{risks}</ul>" if risks else ""
         sources = []
@@ -98,6 +142,11 @@ def render_html(items: list[ReportItem]) -> str:
             else:
                 sources.append(f"<li>{title}<span>{published}</span></li>")
         source_section = "".join(sources) or "<li>Nenhuma fonte citada pelo agente.</li>"
+        historical_metrics = "".join(
+            f'<div class="market-metric"><span>{html.escape(line.split(": ", 1)[0])}</span>'
+            f'<strong>{html.escape(line.split(": ", 1)[1])}</strong></div>'
+            for line in _historical_lines(item)
+        )
         cards.append(f"""
         <article class="card">
           <header class="card-header">
@@ -108,7 +157,8 @@ def render_html(items: list[ReportItem]) -> str:
           </header>
           <section class="metrics" aria-label="Dados de mercado">
             <div class="market-metric"><span>Fechamento</span><strong>R$ {_format_number(item.close)}</strong></div>
-            <div class="market-metric"><span>Variação</span><strong class="{change_class}">{_format_number(item.change_percent, signed=True)}%</strong></div>
+            <div class="market-metric"><span>Variação</span><strong class="{change_class}">{_format_change(item.change_percent)}</strong></div>
+            {historical_metrics}
           </section>
           <p class="rationale">{html.escape(item.rationale)}</p>
           {risks_section}
@@ -125,6 +175,16 @@ def report_items_from_rows(rows: list[object]) -> list[ReportItem]:
     for row in rows:
         analysis, asset, price = row.Analysis, row.Asset, row.Price
         source_rows = getattr(row, "sources", getattr(analysis, "sources", []))
+        snapshot = {}
+        raw_snapshot = getattr(analysis, "market_context_json", None)
+        if raw_snapshot:
+            try:
+                snapshot = json.loads(raw_snapshot)
+                context = HistoricalContext.model_validate(snapshot["historical_context"])
+            except (KeyError, TypeError, ValueError, ValidationError):
+                snapshot, context = {}, None
+        else:
+            context = None
         items.append(ReportItem(
             ticker=asset.ticker,
             analysis_date=analysis.analysis_date,
@@ -133,8 +193,10 @@ def report_items_from_rows(rows: list[object]) -> list[ReportItem]:
             confidence=analysis.confidence,
             rationale=analysis.rationale,
             risks=json.loads(getattr(analysis, "risks_json", "[]")),
-            close=price.close,
-            change_percent=price.change_percent,
+            close=snapshot.get("close", price.close),
+            change_percent=snapshot.get("change_percent", price.change_percent),
             sources=[ReportSource(title=source.news.title, link=source.news.link, published_at=source.news.published_at) for source in sorted(source_rows, key=lambda value: value.source_order)],
+            volume=snapshot.get("volume", getattr(price, "volume", None)),
+            historical_context=context,
         ))
     return items
