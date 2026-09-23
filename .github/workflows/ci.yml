@@ -1,11 +1,16 @@
 name: CI
 
 on:
+  push:
+    branches:
+      - "feat/**"
+      - "fix/**"
   pull_request:
     branches: [main]
 
 permissions:
   contents: read
+  pull-requests: write
 
 jobs:
   test:
@@ -98,3 +103,33 @@ jobs:
             -var="project_id=${{ secrets.GCP_PROJECT_ID }}" \
             -var="admin_ssh_public_key=$CI_SSH_PUBLIC_KEY" \
             -input=false
+
+  create-pr:
+    name: Create pull request to main
+    if: github.event_name == 'push'
+    needs: [test, docker, terraform]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create pull request if one does not already exist
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          HEAD_BRANCH: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          existing_pr_url="$(gh pr list \
+            --state open \
+            --base main \
+            --head "$HEAD_BRANCH" \
+            --json url \
+            --jq '.[0].url // empty')"
+
+          if [ -n "$existing_pr_url" ]; then
+            echo "An open pull request already exists: $existing_pr_url"
+          else
+            gh pr create \
+              --base main \
+              --head "$HEAD_BRANCH" \
+              --title "$HEAD_BRANCH" \
+              --body "Automated pull request created after CI succeeded."
+          fi

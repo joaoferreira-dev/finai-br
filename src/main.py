@@ -4,7 +4,14 @@ import logging
 from time import perf_counter
 from zoneinfo import ZoneInfo
 
-from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED, JobExecutionEvent
+from apscheduler.events import (
+    EVENT_JOB_ERROR,
+    EVENT_JOB_EXECUTED,
+    EVENT_JOB_MAX_INSTANCES,
+    EVENT_JOB_MISSED,
+    JobExecutionEvent,
+    JobSubmissionEvent,
+)
 from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy import select
@@ -18,6 +25,8 @@ from ingestion.news import fetch_news
 from settings import get_settings
 
 logger = logging.getLogger(__name__)
+SCHEDULER_TIMEZONE = ZoneInfo("America/Sao_Paulo")
+SCHEDULER_MISFIRE_GRACE_SECONDS = 300
 
 
 def run_daily_cycle() -> None:
@@ -68,11 +77,46 @@ def run_daily_cycle() -> None:
     logger.info("Ciclo diário finalizado em %.1fs", perf_counter() - started_at)
 
 
-def _log_scheduler_event(event: JobExecutionEvent) -> None:
-    if event.exception:
+def _log_scheduler_event(event: JobExecutionEvent | JobSubmissionEvent) -> None:
+    if event.code == EVENT_JOB_MISSED:
+        logger.error(
+            "Job '%s' não executado: horário %s excedeu a tolerância de %ds",
+            event.job_id,
+            event.scheduled_run_time.astimezone(SCHEDULER_TIMEZONE).isoformat(),
+            SCHEDULER_MISFIRE_GRACE_SECONDS,
+        )
+    elif event.code == EVENT_JOB_MAX_INSTANCES:
+        logger.error("Job '%s' não executado: execução anterior ainda ativa", event.job_id)
+    elif event.code == EVENT_JOB_ERROR:
         logger.error("Job '%s' finalizou com erro", event.job_id)
-    else:
+    elif event.code == EVENT_JOB_EXECUTED:
         logger.info("Job '%s' finalizou com sucesso", event.job_id)
+
+
+def create_scheduler() -> BlockingScheduler:
+    """Allow brief host delays while avoiding overlapping or duplicate runs."""
+    scheduler = BlockingScheduler(
+        timezone=SCHEDULER_TIMEZONE,
+        job_defaults={
+            "misfire_grace_time": SCHEDULER_MISFIRE_GRACE_SECONDS,
+            "coalesce": True,
+            "max_instances": 1,
+        },
+    )
+    scheduler.add_listener(
+        _log_scheduler_event,
+        EVENT_JOB_EXECUTED | EVENT_JOB_ERROR | EVENT_JOB_MISSED | EVENT_JOB_MAX_INSTANCES,
+    )
+    for job_id, callback, hour in (
+        ("daily-cycle", run_daily_cycle, 18),
+        ("send-report", send_latest_report, 8),
+    ):
+        scheduler.add_job(
+            callback,
+            CronTrigger(day_of_week="mon-fri", hour=hour, minute=0, timezone=SCHEDULER_TIMEZONE),
+            id=job_id,
+        )
+    return scheduler
 
 
 def main() -> None:
@@ -90,18 +134,12 @@ def main() -> None:
         send_latest_report()
         logger.info("Envio de relatório finalizado")
     else:
-        scheduler_timezone = ZoneInfo("America/Sao_Paulo")
-        scheduler = BlockingScheduler(timezone=scheduler_timezone)
-        scheduler.add_listener(_log_scheduler_event, EVENT_JOB_EXECUTED | EVENT_JOB_ERROR)
-        scheduler.add_job(run_daily_cycle, CronTrigger(day_of_week="mon-fri", hour=18, minute=0, timezone=scheduler_timezone), id="daily-cycle")
-        scheduler.add_job(
-            send_latest_report,
-            CronTrigger(day_of_week="mon-fri", hour=8, minute=0, timezone=scheduler_timezone),
-            id="send-report",
-            misfire_grace_time=300,
-        )
+        scheduler = create_scheduler()
         for job in scheduler.get_jobs():
-            logger.info("Job '%s' registrado com trigger %s", job.id, job.trigger)
+            logger.info(
+                "Job '%s' registrado com trigger %s; timezone=%s; tolerância=%ds",
+                job.id, job.trigger, SCHEDULER_TIMEZONE, SCHEDULER_MISFIRE_GRACE_SECONDS,
+            )
         if args.run_now:
             logger.info("Executando ciclo imediatamente (--run-now)")
             run_daily_cycle()
