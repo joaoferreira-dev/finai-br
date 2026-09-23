@@ -16,3 +16,4 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 agents = ["prompt/*.yaml"]
+delivery = ["templates/*.html"]

@@ -4,6 +4,7 @@ import pandas as pd
 import pytest
 
 from ingestion import market_data, news
+from ingestion.news import NewsItem, deduplicate_news
 
 
 def test_fetch_news_keeps_recent_entries_and_discards_old_entries(monkeypatch) -> None:
@@ -33,6 +34,35 @@ def test_fetch_news_keeps_recent_entries_and_discards_old_entries(monkeypatch) -
 
     assert [item.title for item in results] == ["Noticia recente", "Sem título"]
     assert results[1].published_at is None
+
+
+def test_fetch_news_strips_html_and_extracts_rss_publisher(monkeypatch) -> None:
+    feed = type("Feed", (), {"entries": [{
+        "title": "PETR4 em alta",
+        "link": "https://example.com/story",
+        "summary": "<p>Caixa <b>forte</b>&nbsp;e dívida menor</p>",
+        "source": {"title": "Jornal Exemplo"},
+    }]})()
+    monkeypatch.setattr(news.feedparser, "parse", lambda url: feed)
+
+    item = news.fetch_news("PETR4")[0]
+
+    assert item.summary == "Caixa forte e dívida menor"
+    assert item.publisher == "Jornal Exemplo"
+    assert item.content_type == "rss_excerpt"
+
+
+def test_news_deduplication_preserves_first_item_and_stable_order() -> None:
+    items = [
+        NewsItem(title="PETR4 <b>subiu</b>", publisher="Jornal", link="https://example.com/a", summary="Um"),
+        NewsItem(title="PETR4 subiu", publisher="Jornal", link="https://example.com/b", summary="Dois"),
+        NewsItem(title="Outra notícia", publisher="Jornal", link="https://example.com/a/", summary="Três"),
+        NewsItem(title="Outra notícia", publisher="Jornal B", link="https://example.com/c", summary="Quatro"),
+    ]
+
+    result = deduplicate_news(items)
+
+    assert [item.summary for item in result] == ["Um", "Quatro"]
 
 
 def test_fetch_price_calculates_change_from_previous_close(monkeypatch) -> None:

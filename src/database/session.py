@@ -26,8 +26,11 @@ def initialise_database() -> None:
 
 def _ensure_analysis_columns() -> None:
     with engine.begin() as connection:
+        connection.execute(text("ALTER TABLE analyses ADD COLUMN IF NOT EXISTS price_date DATE"))
         connection.execute(text("ALTER TABLE analyses ADD COLUMN IF NOT EXISTS direction VARCHAR(20)"))
         connection.execute(text("ALTER TABLE analyses ADD COLUMN IF NOT EXISTS time_horizon VARCHAR(20)"))
         connection.execute(text("ALTER TABLE analyses ADD COLUMN IF NOT EXISTS market_context_json TEXT"))
+        connection.execute(text("ALTER TABLE analyses ADD COLUMN IF NOT EXISTS analysis_details_json TEXT"))
+        connection.execute(text("ALTER TABLE news ADD COLUMN IF NOT EXISTS publisher VARCHAR(255)"))
         connection.execute(text("ALTER TABLE prices ALTER COLUMN change_percent DROP NOT NULL"))
         connection.execute(text("ALTER TABLE prices ALTER COLUMN volume DROP NOT NULL"))

@@ -1,16 +1,19 @@
 import json
+import logging
 import re
 from pathlib import Path
 from typing import TypedDict
 
-from langgraph.graph import END, START, StateGraph
 from langchain_core.prompts import ChatPromptTemplate
+from langgraph.graph import END, START, StateGraph
 from openai import OpenAI
 import yaml
 
 from agents.schemas import ResearchEvidence, TickerAnalysis
-from ingestion.news import NewsItem
+from ingestion.news import NewsItem, deduplicate_news, normalize_text
 from settings import Settings
+
+logger = logging.getLogger(__name__)
 
 
 class WorkflowState(TypedDict):
@@ -22,6 +25,7 @@ class WorkflowState(TypedDict):
 
 
 PROMPT_DIR = Path(__file__).parent / "prompt"
+CITATION_RE = re.compile(r"\[(\d+)\]")
 
 
 def _load_prompt(name: str) -> ChatPromptTemplate:
@@ -38,6 +42,40 @@ def _as_openai_messages(prompt: ChatPromptTemplate, values: dict) -> list[dict[s
         {"role": role_map[message.type], "content": message.content}
         for message in prompt.invoke(values).to_messages()
     ]
+
+
+def _all_texts(analysis: TickerAnalysis) -> list[str]:
+    texts = [analysis.rationale, analysis.summary, *analysis.risks, *analysis.limitations]
+    for point in [*analysis.catalysts, *analysis.risk_details]:
+        texts.extend([point.text, point.mechanism])
+    for forecast in analysis.forecasts:
+        texts.extend([forecast.broker, forecast.metric_type, forecast.value, *forecast.assumptions])
+    return [text for text in texts if text]
+
+
+def _referenced_ids(texts: list[str]) -> set[int]:
+    return {int(value) for text in texts for value in CITATION_RE.findall(text)}
+
+
+def _validate_claim_citations(analysis: TickerAnalysis, research_ids: set[int]) -> None:
+    """Require every evidence-backed claim to resolve to its supporting research."""
+    if research_ids and not _referenced_ids([analysis.rationale, analysis.summary]):
+        raise ValueError("síntese sem citação de evidência")
+    for text in analysis.risks:
+        if not _referenced_ids([text]):
+            raise ValueError("risco sem citação de evidência")
+    for point in [*analysis.catalysts, *analysis.risk_details]:
+        if not (set(point.source_ids) | _referenced_ids([point.text])).intersection(research_ids):
+            raise ValueError("catalisador ou risco estruturado sem fonte")
+    for forecast in analysis.forecasts:
+        if not (set(forecast.source_ids) | _referenced_ids([forecast.broker, forecast.metric_type, forecast.value, *forecast.assumptions])).intersection(research_ids):
+            raise ValueError("projeção sem fonte atribuída")
+
+
+def _valid_excerpt(excerpt: str, news_item: dict) -> bool:
+    candidate = normalize_text(excerpt).casefold()
+    source_text = " ".join((news_item.get("title", ""), news_item.get("summary", ""))).casefold()
+    return bool(candidate and candidate in source_text)
 
 
 class MarketWorkflow:
@@ -86,36 +124,104 @@ class MarketWorkflow:
         return response.choices[0].message.content or ""
 
     def research(self, state: WorkflowState) -> dict:
-        response = self.ask(_as_openai_messages(self.research_prompt, {
+        numbered = _number_news(state["news"])
+        messages = _as_openai_messages(self.research_prompt, {
             "ticker": state["ticker"],
-            "news": json.dumps(_number_news(state["news"]), ensure_ascii=False),
-        }))
-        research = [ResearchEvidence.model_validate(item) for item in _parse_json_response(response, list)]
-        valid_ids = set(range(1, len(state["news"]) + 1))
-        return {"research_summary": [item for item in research if item.source_id in valid_ids]}
+            "news": json.dumps(numbered, ensure_ascii=False),
+        })
+        for attempt in range(2):
+            try:
+                response = self.ask(messages)
+                raw_items = _parse_json_response(response, list)
+                research = [ResearchEvidence.model_validate(item) for item in raw_items]
+                for item in research:
+                    ids = {item.source_id, *item.related_source_ids}
+                    if not ids.issubset(set(range(1, len(numbered) + 1))):
+                        raise ValueError("pesquisa referencia fonte inexistente")
+                    source = numbered[item.source_id - 1]
+                    if not _valid_excerpt(item.supporting_excerpt, source):
+                        raise ValueError("trecho de apoio não encontrado na notícia RSS")
+                return {"research_summary": [item for item in research if item.relevance.casefold() != "irrelevante"]}
+            except Exception as error:
+                logger.warning("Pesquisa inválida para %s (tentativa %d): %s", state["ticker"], attempt + 1, type(error).__name__)
+                if attempt == 0:
+                    messages = _with_repair(messages, error)
+        logger.error("Pesquisa indisponível para %s após tentativa de correção", state["ticker"])
+        return {"research_summary": []}
 
     def analyse(self, state: WorkflowState) -> dict:
         price = {**state["price"], "trading_date": state["price"]["trading_date"].isoformat()}
-        response = self.ask(_as_openai_messages(self.analyse_prompt, {
+        news = _number_news(state["news"])
+        messages = _as_openai_messages(self.analyse_prompt, {
             "ticker": state["ticker"],
             "price": json.dumps(price, ensure_ascii=False, allow_nan=False),
             "research_summary": json.dumps([item.model_dump() for item in state["research_summary"]], ensure_ascii=False),
-            "news": json.dumps(_number_news(state["news"]), ensure_ascii=False),
-        }))
-        analysis = TickerAnalysis.model_validate(_parse_json_response(response, dict))
-        valid_ids = set(range(1, len(state["news"]) + 1))
-        analysis.source_ids = sorted({source_id for source_id in analysis.source_ids if source_id in valid_ids})
-        cited_ids = {int(value) for value in re.findall(r"\[(\d+)\]", analysis.rationale)}
-        analysis.source_ids = sorted(set(analysis.source_ids) | (cited_ids & valid_ids))
-        return {"analysis": analysis}
+            "news": json.dumps(news, ensure_ascii=False),
+        })
+        for attempt in range(2):
+            try:
+                response = self.ask(messages)
+                analysis = TickerAnalysis.model_validate(_parse_json_response(response, dict))
+                texts = _all_texts(analysis)
+                cited_ids = _referenced_ids(texts)
+                listed_ids = set(analysis.source_ids)
+                for point in [*analysis.catalysts, *analysis.risk_details, *analysis.forecasts]:
+                    listed_ids.update(point.source_ids)
+                valid_ids = set(range(1, len(news) + 1))
+                if not cited_ids.issubset(valid_ids) or not listed_ids.issubset(valid_ids):
+                    raise ValueError("análise referencia fonte inexistente")
+                research_ids = {
+                    source_id
+                    for item in state["research_summary"]
+                    for source_id in {item.source_id, *item.related_source_ids}
+                }
+                _validate_claim_citations(analysis, research_ids)
+                if not (cited_ids | listed_ids).issubset(research_ids):
+                    raise ValueError("análise cita notícia sem evidência validada")
+                analysis.source_ids = sorted(cited_ids | listed_ids)
+                return {"analysis": analysis}
+            except Exception as error:
+                logger.warning("Análise inválida para %s (tentativa %d): %s", state["ticker"], attempt + 1, type(error).__name__)
+                if attempt == 0:
+                    messages = _with_repair(messages, error)
+        logger.error("Análise indisponível para %s após tentativa de correção", state["ticker"])
+        return {"analysis": TickerAnalysis(
+            direction="neutro", confidence=0, time_horizon="incerto",
+            rationale="Análise indisponível: a resposta não passou pela validação de evidências.",
+            summary="Não foi possível validar uma análise para este ativo.",
+            limitations=["Análise indisponível após tentativa de correção da resposta."],
+        )}
 
     def invoke(self, ticker: str, price: dict, news: list[NewsItem]) -> TickerAnalysis:
-        output = self.graph.invoke({"ticker": ticker, "price": price, "news": [item.model_dump(mode="json") for item in news]})
-        return output["analysis"]
+        clean_news = deduplicate_news(news)
+        output = self.graph.invoke({
+            "ticker": ticker, "price": price,
+            "news": [item.model_dump(mode="json") for item in clean_news],
+        })
+        analysis = output["analysis"]
+        analysis.research_evidence = output["research_summary"]
+        research_ids = {
+            source_id
+            for item in output["research_summary"]
+            for source_id in {item.source_id, *item.related_source_ids}
+        }
+        analysis.source_ids = sorted(set(analysis.source_ids) | research_ids)
+        return analysis
+
+
+def _with_repair(messages: list[dict[str, str]], error: Exception) -> list[dict[str, str]]:
+    return [*messages, {
+        "role": "user",
+        "content": f"Corrija a resposta anterior. Problema de validação: {type(error).__name__}. "
+                   "Retorne somente o JSON solicitado, usando apenas as fontes fornecidas.",
+    }]
 
 
 def _number_news(news: list[dict]) -> list[dict]:
-    return [{"source_id": index, **item} for index, item in enumerate(news, start=1)]
+    numbered = []
+    for index, item in enumerate(news, start=1):
+        numbered.append({"source_id": index, "content_type": "rss_excerpt", **item})
+    return numbered
 
 
 def _parse_json_response(response: str, expected_type: type) -> object:

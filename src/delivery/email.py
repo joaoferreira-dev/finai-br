@@ -2,7 +2,7 @@ import logging
 from email.message import EmailMessage
 import smtplib
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
 from database.models import Analysis, Asset, Price
@@ -23,7 +23,9 @@ def send_latest_report() -> None:
         query = (
             select(Analysis, Asset, Price)
             .join(Asset, Analysis.asset_id == Asset.id)
-            .join(Price, (Price.asset_id == Asset.id) & (Price.trading_date == Analysis.analysis_date))
+            .join(Price, (Price.asset_id == Asset.id) & (
+                Price.trading_date == func.coalesce(Analysis.price_date, Analysis.analysis_date)
+            ))
             .options(selectinload(Analysis.sources).selectinload(AnalysisNews.news))
             .order_by(Analysis.analysis_date.desc(), Asset.ticker)
         )
