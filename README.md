@@ -35,7 +35,14 @@ docker compose run --rm finai python -m main scheduler --run-now
 ```
 
 O agendador executa coleta/análise às 18:00 BRT, de segunda a sexta, e envia o
-relatório mais recente às 08:00 BRT. Feriados da B3 ainda não são considerados.
+relatório mais recente às 06:00 BRT. Feriados da B3 ainda não são considerados.
+
+A data da análise é a data de início da execução em `America/Sao_Paulo`.
+A data da cotação é preservada separadamente: uma execução em 23/09 pode usar
+o fechamento de 22/09. Reexecutar no mesmo dia substitui a análise desse dia;
+executar no dia seguinte gera uma nova análise, mesmo com a mesma cotação.
+Após alterações de código, use `docker compose run --build --rm finai python -m main run`
+para reconstruir a imagem antes da execução local.
 
 Para desenvolvimento local, instale as dependências e o projeto em modo
 editável, exporte as variáveis do `.env` e execute os comandos normalmente:

@@ -49,7 +49,17 @@ O sistema operará de forma totalmente automatizada uma vez por dia, focando em 
 * **Dados de Texto:** `feedparser` conectado ao RSS do Google News Brasil.
 * **Orquestração de IA:** Framework `LangGraph` para gerenciar a passagem de contexto entre o Agente Pesquisador e o Agente Analista.
 
-## 7. Cronograma Proposto de Implementação
+## 7. Evidência e apresentação dos relatórios
+
+* As notícias são trechos fornecidos pelo RSS; o sistema não busca o texto integral dos artigos.
+* Duplicatas são removidas antes de numerar fontes. Trechos de apoio são validados contra o título e o resumo recebidos.
+* Fatos, interpretações e projeções atribuídas são apresentados separadamente. Projeções preservam métrica, unidade, horizonte, autoria e premissas disponíveis; “retorno” sem definição permanece ambíguo.
+* A qualidade da evidência descreve o suporte disponível para a síntese, não a probabilidade de retorno do ativo. Evidência baseada somente em RSS é limitada, no máximo, e não há classificação quando nenhuma evidência relevante foi validada.
+* Cada análise salva uma cópia versionada de seu conteúdo estruturado, evidências, referências e limitações. Análises antigas sem esse conteúdo são identificadas como legadas.
+* `analysis_date` é a data do início da execução em `America/Sao_Paulo`, capturada uma vez para todos os ativos. `price_date` mantém a data real da cotação. Cabeçalho e assunto usam a data da análise; “Cotação em” mantém a data do pregão.
+* Reexecuções no mesmo dia substituem a análise, o snapshot e suas fontes; dias diferentes geram análises distintas mesmo quando a cotação é a mesma. Registros legados mantêm suas datas e usam `analysis_date` para localizar a cotação quando `price_date` é nulo, sem backfill.
+
+## 8. Cronograma Proposto de Implementação
 * **Semana 1:** Setup do ambiente, modelagem do banco de dados PostgreSQL e criação dos scripts de ingestão (`yfinance` + RSS).
 * **Semana 2:** Desenvolvimento da camada de IA, refinamento de prompts e garantia de outputs estruturados em JSON.
 * **Semana 3:** Integração dos componentes, configuração do agendamento automatizado e desenvolvimento do serviço de envio de emails.

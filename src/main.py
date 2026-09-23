@@ -1,6 +1,7 @@
 import argparse
 import json
 import logging
+from datetime import datetime
 from time import perf_counter
 from zoneinfo import ZoneInfo
 
@@ -21,7 +22,7 @@ from database.models import Analysis, AnalysisNews, Asset, News, Price
 from database.session import DEFAULT_ASSETS, SessionLocal, initialise_database
 from delivery.email import send_latest_report
 from ingestion.market_data import fetch_price
-from ingestion.news import fetch_news
+from ingestion.news import deduplicate_news, fetch_news
 from settings import get_settings
 
 logger = logging.getLogger(__name__)
@@ -31,7 +32,9 @@ SCHEDULER_MISFIRE_GRACE_SECONDS = 300
 
 def run_daily_cycle() -> None:
     started_at = perf_counter()
-    logger.info("Iniciando ciclo diário de coleta e análise")
+    run_at = datetime.now(SCHEDULER_TIMEZONE)
+    analysis_date = run_at.date()
+    logger.info("Iniciando ciclo diário de coleta e análise para %s", analysis_date)
     workflow = MarketWorkflow(get_settings())
     with SessionLocal() as session:
         assets = session.scalars(select(Asset).where(Asset.ticker.in_(DEFAULT_ASSETS))).all()
@@ -39,7 +42,7 @@ def run_daily_cycle() -> None:
     for asset in assets:
         try:
             logger.info("Coletando dados de %s", asset.ticker)
-            price, news = fetch_price(asset.ticker), fetch_news(asset.ticker)
+            price, news = fetch_price(asset.ticker), deduplicate_news(fetch_news(asset.ticker))
             logger.info("%s: preço coletado para %s e %d notícias", asset.ticker, price["trading_date"], len(news))
             analysis = workflow.invoke(asset.ticker, price, news)
             market_snapshot = {
@@ -63,16 +66,31 @@ def run_daily_cycle() -> None:
                     ))
                 for item in news:
                     if item.link and not session.scalar(select(News).where(News.link == item.link)):
-                        session.add(News(asset_id=asset.id, **item.model_dump()))
-                existing = session.scalar(select(Analysis).where(Analysis.asset_id == asset.id, Analysis.analysis_date == price["trading_date"]))
-                values = dict(sentiment=analysis.direction.value, direction=analysis.direction.value, time_horizon=analysis.time_horizon.value, confidence=analysis.confidence, rationale=analysis.rationale, risks_json=json.dumps(analysis.risks, ensure_ascii=False), market_context_json=json.dumps(market_snapshot, ensure_ascii=False, allow_nan=False))
+                        session.add(News(asset_id=asset.id, **item.model_dump(exclude={"content_type"})))
+                existing = session.scalar(select(Analysis).where(Analysis.asset_id == asset.id, Analysis.analysis_date == analysis_date))
+                details_snapshot = {
+                    "version": 1,
+                    "run_at": run_at.isoformat(),
+                    "analysis": analysis.model_dump(mode="json", exclude={"research_evidence"}),
+                    "research_evidence": [item.model_dump(mode="json") for item in analysis.research_evidence],
+                    "source_metadata": [
+                        {"source_id": index, "title": item.title, "link": item.link,
+                         "publisher": item.publisher, "published_at": item.published_at.isoformat() if item.published_at else None,
+                         "content_type": item.content_type}
+                        for index, item in enumerate(news, start=1)
+                        if index in analysis.source_ids
+                    ],
+                    "limitations": analysis.limitations,
+                }
+                values = dict(sentiment=analysis.direction.value, direction=analysis.direction.value, time_horizon=analysis.time_horizon.value, confidence=analysis.confidence, rationale=analysis.rationale, risks_json=json.dumps(analysis.risks, ensure_ascii=False), market_context_json=json.dumps(market_snapshot, ensure_ascii=False, allow_nan=False), analysis_details_json=json.dumps(details_snapshot, ensure_ascii=False, allow_nan=False))
+                values["price_date"] = price["trading_date"]
                 if existing:
                     for key, value in values.items():
                         setattr(existing, key, value)
                     existing.sources.clear()
                     analysis_record = existing
                 else:
-                    analysis_record = Analysis(asset_id=asset.id, analysis_date=price["trading_date"], **values)
+                    analysis_record = Analysis(asset_id=asset.id, analysis_date=analysis_date, **values)
                     session.add(analysis_record)
                 session.flush()
                 source_links = [news_item.link for index, news_item in enumerate(news, start=1) if index in analysis.source_ids and news_item.link]

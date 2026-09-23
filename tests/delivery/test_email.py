@@ -88,7 +88,8 @@ def test_send_latest_report_formats_latest_analysis(monkeypatch) -> None:
             self.message = message
             assert message["To"] == "to@example.com"
             parts = {part.get_content_type(): part.get_content() for part in message.walk() if part.get_content_type() in {"text/plain", "text/html"}}
-            assert "PETR4: Moderado (72%)" in parts["text/plain"]
+            assert "PETR4: Moderado" in parts["text/plain"]
+            assert "Qualidade da evidência" in parts["text/plain"]
             assert "Panorama diário" in parts["text/html"]
 
     monkeypatch.setattr(email, "get_settings", lambda: settings)

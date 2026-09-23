@@ -47,8 +47,11 @@ def test_bootstrap_statements_can_be_repeated(monkeypatch) -> None:
     monkeypatch.setattr(database_session, "engine", FakeEngine())
     database_session._ensure_analysis_columns()
     database_session._ensure_analysis_columns()
-    assert len(statements) == 10
+    assert len(statements) == 16
+    assert statements.count("ALTER TABLE analyses ADD COLUMN IF NOT EXISTS price_date DATE") == 2
     assert statements.count("ALTER TABLE analyses ADD COLUMN IF NOT EXISTS market_context_json TEXT") == 2
+    assert statements.count("ALTER TABLE analyses ADD COLUMN IF NOT EXISTS analysis_details_json TEXT") == 2
+    assert statements.count("ALTER TABLE news ADD COLUMN IF NOT EXISTS publisher VARCHAR(255)") == 2
     assert statements.count("ALTER TABLE prices ALTER COLUMN volume DROP NOT NULL") == 2
 
 
@@ -108,6 +111,9 @@ def test_daily_cycle_persists_and_replaces_snapshot(monkeypatch) -> None:
 
     main.run_daily_cycle()
     first_snapshot = json.loads(state["analysis"].market_context_json)
+    first_details = json.loads(state["analysis"].analysis_details_json)
+    assert first_details["version"] == 1
+    assert first_details["analysis"]["confidence"] == 30
     assert first_snapshot["historical_context"]["as_of_date"] == "2026-09-18"
     assert state["price"].volume is None
     assert state["price"].change_percent == pytest.approx(5)

@@ -35,6 +35,7 @@ class News(Base):
     title: Mapped[str] = mapped_column(Text)
     link: Mapped[str] = mapped_column(Text, unique=True)
     summary: Mapped[str] = mapped_column(Text)
+    publisher: Mapped[str | None] = mapped_column(String(255), nullable=True)
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     collected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
 
@@ -45,6 +46,7 @@ class Analysis(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     asset_id: Mapped[int] = mapped_column(ForeignKey("assets.id"))
     analysis_date: Mapped[date] = mapped_column(Date)
+    price_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     sentiment: Mapped[str] = mapped_column(String(40))
     confidence: Mapped[int] = mapped_column(Integer)
     direction: Mapped[str | None] = mapped_column(String(20), nullable=True)
@@ -52,6 +54,7 @@ class Analysis(Base):
     rationale: Mapped[str] = mapped_column(Text)
     risks_json: Mapped[str] = mapped_column(Text)
     market_context_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    analysis_details_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
     sources: Mapped[list["AnalysisNews"]] = relationship(back_populates="analysis", cascade="all, delete-orphan")
 
