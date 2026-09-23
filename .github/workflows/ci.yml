@@ -116,8 +116,16 @@ jobs:
           GH_REPO: ${{ github.repository }}
           HEAD_BRANCH: ${{ github.ref_name }}
         run: |
-          if gh pr view "$HEAD_BRANCH" --json url >/dev/null 2>&1; then
-            echo "An open pull request already exists for $HEAD_BRANCH."
+          set -euo pipefail
+          existing_pr_url="$(gh pr list \
+            --state open \
+            --base main \
+            --head "$HEAD_BRANCH" \
+            --json url \
+            --jq '.[0].url // empty')"
+
+          if [ -n "$existing_pr_url" ]; then
+            echo "An open pull request already exists: $existing_pr_url"
           else
             gh pr create \
               --base main \
