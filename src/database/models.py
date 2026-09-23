@@ -23,8 +23,8 @@ class Price(Base):
     asset_id: Mapped[int] = mapped_column(ForeignKey("assets.id"))
     trading_date: Mapped[date] = mapped_column(Date)
     close: Mapped[float] = mapped_column(Float)
-    change_percent: Mapped[float] = mapped_column(Float)
-    volume: Mapped[int] = mapped_column(Integer)
+    change_percent: Mapped[float | None] = mapped_column(Float, nullable=True)
+    volume: Mapped[int | None] = mapped_column(Integer, nullable=True)
     asset: Mapped[Asset] = relationship(back_populates="prices")
 
 
@@ -51,6 +51,7 @@ class Analysis(Base):
     time_horizon: Mapped[str | None] = mapped_column(String(20), nullable=True)
     rationale: Mapped[str] = mapped_column(Text)
     risks_json: Mapped[str] = mapped_column(Text)
+    market_context_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
     sources: Mapped[list["AnalysisNews"]] = relationship(back_populates="analysis", cascade="all, delete-orphan")
 

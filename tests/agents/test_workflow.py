@@ -107,3 +107,31 @@ def test_workflow_reports_groq_api_configuration_errors(monkeypatch, status_code
 
     with pytest.raises(RuntimeError, match=message):
         workflow.ask([{"role": "user", "content": "teste"}])
+
+
+def test_analyst_receives_calculated_context_and_concise_guidance(monkeypatch) -> None:
+    prompts = []
+
+    class CaptureCompletions:
+        def create(self, **kwargs):
+            prompts.append(kwargs["messages"])
+            result = (
+                "[]" if len(prompts) == 1 else
+                '{"direction":"neutro","confidence":20,"time_horizon":"incerto","rationale":"Sem notícias suficientes.","risks":[],"source_ids":[]}'
+            )
+            return FakeResponse(result)
+
+    client = type("Client", (), {"chat": type("Chat", (), {"completions": CaptureCompletions()})()})()
+    monkeypatch.setattr(market_workflow, "OpenAI", lambda **kwargs: client)
+    workflow = market_workflow.MarketWorkflow(Settings(groq_api_key="test-key"))
+    quote = {
+        "trading_date": date(2026, 9, 18), "close": 42.0,
+        "change_percent": None, "volume": None,
+        "historical_context": {"change_5_sessions": {"value": None, "reason": "histórico insuficiente"}},
+    }
+    workflow.invoke("PETR4", quote, [])
+    assert len(prompts) == 2
+    assert '"historical_context"' in prompts[1][1]["content"]
+    assert "histórico insuficiente" in prompts[1][1]["content"]
+    assert "2 ou 3 frases" in prompts[1][0]["content"]
+    assert "não prova causalidade" in prompts[1][0]["content"]

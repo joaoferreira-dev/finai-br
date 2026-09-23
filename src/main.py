@@ -42,17 +42,30 @@ def run_daily_cycle() -> None:
             price, news = fetch_price(asset.ticker), fetch_news(asset.ticker)
             logger.info("%s: preço coletado para %s e %d notícias", asset.ticker, price["trading_date"], len(news))
             analysis = workflow.invoke(asset.ticker, price, news)
+            market_snapshot = {
+                "trading_date": price["trading_date"].isoformat(),
+                "close": price["close"],
+                "change_percent": price["change_percent"],
+                "volume": price["volume"],
+                "historical_context": price["historical_context"],
+            }
             with SessionLocal() as session:
                 existing_price = session.scalar(select(Price).where(Price.asset_id == asset.id, Price.trading_date == price["trading_date"]))
                 if existing_price:
                     existing_price.close, existing_price.change_percent, existing_price.volume = price["close"], price["change_percent"], price["volume"]
                 else:
-                    session.add(Price(asset_id=asset.id, **price))
+                    session.add(Price(
+                        asset_id=asset.id,
+                        trading_date=price["trading_date"],
+                        close=price["close"],
+                        change_percent=price["change_percent"],
+                        volume=price["volume"],
+                    ))
                 for item in news:
                     if item.link and not session.scalar(select(News).where(News.link == item.link)):
                         session.add(News(asset_id=asset.id, **item.model_dump()))
                 existing = session.scalar(select(Analysis).where(Analysis.asset_id == asset.id, Analysis.analysis_date == price["trading_date"]))
-                values = dict(sentiment=analysis.direction.value, direction=analysis.direction.value, time_horizon=analysis.time_horizon.value, confidence=analysis.confidence, rationale=analysis.rationale, risks_json=json.dumps(analysis.risks, ensure_ascii=False))
+                values = dict(sentiment=analysis.direction.value, direction=analysis.direction.value, time_horizon=analysis.time_horizon.value, confidence=analysis.confidence, rationale=analysis.rationale, risks_json=json.dumps(analysis.risks, ensure_ascii=False), market_context_json=json.dumps(market_snapshot, ensure_ascii=False, allow_nan=False))
                 if existing:
                     for key, value in values.items():
                         setattr(existing, key, value)

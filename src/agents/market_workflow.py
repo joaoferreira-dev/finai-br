@@ -98,7 +98,7 @@ class MarketWorkflow:
         price = {**state["price"], "trading_date": state["price"]["trading_date"].isoformat()}
         response = self.ask(_as_openai_messages(self.analyse_prompt, {
             "ticker": state["ticker"],
-            "price": json.dumps(price, ensure_ascii=False),
+            "price": json.dumps(price, ensure_ascii=False, allow_nan=False),
             "research_summary": json.dumps([item.model_dump() for item in state["research_summary"]], ensure_ascii=False),
             "news": json.dumps(_number_news(state["news"]), ensure_ascii=False),
         }))
